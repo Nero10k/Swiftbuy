@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r;
+  }
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl;
+  }
+  .glass-dark {
+    @apply bg-gray-950/70 backdrop-blur-xl;
+  }
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-delayed { animation: float-delayed 5s ease-in-out 1s infinite; }
+.animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }
+
+/* Infinite scrolling rows */
+@keyframes scroll-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes scroll-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+.scroll-row-left {
+  animation: scroll-left 40s linear infinite;
+}
+.scroll-row-right {
+  animation: scroll-right 40s linear infinite;
+}
+.scroll-row-left-slow {
+  animation: scroll-left 55s linear infinite;
+}
+.scroll-row-right-slow {
+  animation: scroll-right 55s linear infinite;
+}
+.scroll-row-left-fast {
+  animation: scroll-left 30s linear infinite;
+}
+
+/* Pause on hover */
+.scroll-container:hover .scroll-row-left,
+.scroll-container:hover .scroll-row-right,
+.scroll-container:hover .scroll-row-left-slow,
+.scroll-container:hover .scroll-row-right-slow,
+.scroll-container:hover .scroll-row-left-fast {
+  animation-play-state: paused;
+}
