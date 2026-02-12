@@ -327,34 +327,50 @@ export default function DashboardPage() {
                 Bearer Token
               </label>
               <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-3.5 py-2.5 bg-black/30 border border-white/[0.06] rounded-lg text-xs font-mono text-white overflow-hidden">
+                <code className="flex-1 px-3.5 py-2.5 bg-black/30 border border-white/[0.06] rounded-lg text-xs font-mono text-white break-all whitespace-pre-wrap max-h-32 overflow-y-auto">
                   {showToken ? newAgent.token : `${newAgent.token.substring(0, 30)}...`}
                 </code>
-                <button
-                  onClick={() => setShowToken(!showToken)}
-                  className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
-                >
-                  {showToken ? <EyeOff className="h-3.5 w-3.5 text-gray-500" /> : <Eye className="h-3.5 w-3.5 text-gray-500" />}
-                </button>
-                <button
-                  onClick={() => handleCopy(newAgent.token, 'token')}
-                  className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
-                >
-                  {copiedField === 'token' ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
-                </button>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    onClick={() => setShowToken(!showToken)}
+                    className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
+                    title={showToken ? 'Hide token' : 'Show full token'}
+                  >
+                    {showToken ? <EyeOff className="h-3.5 w-3.5 text-gray-500" /> : <Eye className="h-3.5 w-3.5 text-gray-500" />}
+                  </button>
+                  <button
+                    onClick={() => handleCopy(newAgent.token, 'token')}
+                    className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
+                    title="Copy full token"
+                  >
+                    {copiedField === 'token' ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
+                  </button>
+                </div>
               </div>
+              <p className="text-[10px] text-gray-600 mt-1">
+                {copiedField === 'token' ? '✅ Full token copied to clipboard!' : 'Click the copy button to copy the full token'}
+              </p>
             </div>
           </div>
 
           {/* Skill.md snippet */}
-          <div className="bg-black/40 rounded-xl p-4 overflow-x-auto">
+          <div className="bg-black/40 rounded-xl p-4">
             <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-2">
               Add to your OpenClaw agent
             </p>
-            <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+            <div className="relative">
+              <pre className="text-xs font-mono text-gray-300 leading-relaxed break-all whitespace-pre-wrap">
 {`skill_url: ${skillUrl}
-AGENT_TOKEN=${showToken ? newAgent.token : newAgent.token.substring(0, 20) + '...'}`}
-            </pre>
+AGENT_TOKEN=${newAgent.token}`}
+              </pre>
+              <button
+                onClick={() => handleCopy(`skill_url: ${skillUrl}\nAGENT_TOKEN=${newAgent.token}`, 'agentConfig')}
+                className="absolute top-0 right-0 p-1.5 rounded-lg border border-white/[0.06] bg-black/50 hover:bg-white/[0.06] transition-colors"
+                title="Copy all"
+              >
+                {copiedField === 'agentConfig' ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3 text-gray-500" />}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 p-3 bg-yellow-500/[0.03] border border-yellow-500/10 rounded-lg">
