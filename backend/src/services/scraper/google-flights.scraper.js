@@ -37,6 +37,9 @@ class GoogleTravelScraper {
     try {
       logger.info(`Google Flights: searching "${query}"`);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(this.searchUrl, {
         method: 'POST',
         headers: {
@@ -49,7 +52,9 @@ class GoogleTravelScraper {
           hl: 'en',
           num: 20,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const errText = await response.text();
@@ -101,6 +106,9 @@ class GoogleTravelScraper {
     try {
       logger.info(`Google Hotels: searching "${query}"`);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(this.searchUrl, {
         method: 'POST',
         headers: {
@@ -113,7 +121,9 @@ class GoogleTravelScraper {
           hl: 'en',
           num: 20,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const errText = await response.text();
@@ -159,6 +169,9 @@ class GoogleTravelScraper {
     try {
       logger.info(`Google Travel/General: searching "${query}"`);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(this.searchUrl, {
         method: 'POST',
         headers: {
@@ -171,7 +184,9 @@ class GoogleTravelScraper {
           hl: 'en',
           num: 20,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const errText = await response.text();

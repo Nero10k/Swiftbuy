@@ -2,6 +2,7 @@ const logger = require('../../utils/logger');
 const amazonScraper = require('./amazon.scraper');
 const googleShoppingScraper = require('./google-shopping.scraper');
 const googleTravelScraper = require('./google-flights.scraper');
+const config = require('../../config');
 
 /**
  * Scraper Manager
@@ -115,8 +116,8 @@ class ScraperManager {
       logger.info('Google Shopping API not configured (set SERPER_API_KEY in .env — free at https://serper.dev)');
     }
 
-    // Phase 2: Amazon direct scraper (fallback when API unavailable or returned too few results)
-    if (results.products.length < 3) {
+    // Phase 2: Amazon direct scraper (fallback — only in development, requires Playwright/Chromium)
+    if (results.products.length < 3 && config.env === 'development') {
       try {
         logger.info(`Phase 2: ${results.products.length === 0 ? 'Primary' : 'Supplementing with'} Amazon direct search...`);
         const amazonResults = await amazonScraper.search(query, filters, limit);
@@ -130,6 +131,8 @@ class ScraperManager {
         logger.warn(`Amazon fallback failed: ${error.message}`);
         results.errors.push({ source: 'amazon', error: error.message });
       }
+    } else if (results.products.length < 3 && config.env !== 'development') {
+      logger.info('Skipping Amazon Playwright scraper in production (no Chromium available)');
     }
 
     // Phase 3: Deduplicate and rank
@@ -229,8 +232,8 @@ class ScraperManager {
       }
     }
 
-    // Amazon fallback for physical products (tickets, gift cards)
-    if (results.length < 3) {
+    // Amazon fallback for physical products (only in development — requires Playwright)
+    if (results.length < 3 && config.env === 'development') {
       try {
         const amazonResults = await amazonScraper.search(query, filters, limit);
         results.push(...amazonResults);

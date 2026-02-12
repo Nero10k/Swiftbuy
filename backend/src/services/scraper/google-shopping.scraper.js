@@ -53,6 +53,9 @@ class GoogleShoppingScraper extends BaseScraper {
         num: Math.min(limit * 2, 40), // Request extra for post-filtering
       };
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
@@ -60,7 +63,9 @@ class GoogleShoppingScraper extends BaseScraper {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const errText = await response.text();
