@@ -351,9 +351,9 @@ const registerAgent = async (req, res, next) => {
       },
     });
 
-    // Generate agent JWT token
+    // Generate agent JWT token — includes userId so the agent knows who it's shopping for
     const token = jwt.sign(
-      { agentId, agentName, permissions: validPermissions },
+      { agentId, agentName, userId: req.user._id.toString(), permissions: validPermissions },
       config.jwt.agentSecret,
       { expiresIn: '365d' }
     );
@@ -363,6 +363,7 @@ const registerAgent = async (req, res, next) => {
       data: {
         agentId,
         agentName,
+        userId: req.user._id.toString(),  // So the agent knows the user_id
         apiKey,       // Only shown once!
         token,        // Bearer token for API calls
         permissions: validPermissions,

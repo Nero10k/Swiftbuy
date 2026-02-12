@@ -448,7 +448,67 @@ const getUserProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Agent: Get identity — who am I and who is my user?
+ * GET /api/v1/agent/me
+ *
+ * This is the FIRST endpoint agents should call.
+ * It tells the agent its own identity and the user it's authorized for,
+ * so the agent doesn't need to be manually configured with a user_id.
+ */
+const getAgentIdentity = async (req, res, next) => {
+  try {
+    const agentUserId = req.agent.userId;
+
+    let userData = null;
+    let agentMessage = '';
+    let agentInstructions = '';
+
+    if (agentUserId) {
+      const user = await User.findById(agentUserId).select('name email profile preferences shippingAddresses walletAddress');
+      if (user) {
+        userData = {
+          userId: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          hasWallet: !!user.walletAddress,
+          hasAddress: user.shippingAddresses?.length > 0,
+          hasProfile: !!(user.profile?.notes || user.profile?.gender),
+          preferences: {
+            requireApproval: user.preferences?.requireApproval,
+            maxAutoApprove: user.preferences?.maxAutoApprove,
+          },
+        };
+        agentMessage = `Connected! I'm your Swiftbuy shopping agent. I'm linked to ${user.name}'s account and ready to search, compare, and purchase anything on the web for you.`;
+        agentInstructions = `You are now connected to Swiftbuy. The user_id for all API calls is: ${user._id.toString()}. Start by greeting the user and asking how you can help them shop today. Use this user_id in all subsequent API calls (search, purchase, profile, wallet, etc).`;
+      }
+    }
+
+    if (!userData) {
+      agentMessage = 'I connected to Swiftbuy but couldn\'t find a linked user account. Please make sure your agent token is set up correctly on the Swiftbuy dashboard.';
+      agentInstructions = 'The agent token does not contain a valid user_id. The user may need to re-register the agent on their Swiftbuy dashboard.';
+    }
+
+    res.json({
+      success: true,
+      data: {
+        agent: {
+          agentId: req.agent.id,
+          agentName: req.agent.name,
+          permissions: req.agent.permissions,
+        },
+        user: userData,
+        agentMessage,
+        agentInstructions,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  getAgentIdentity,
   searchProducts,
   initiatePurchase,
   approveOrder,

@@ -7,6 +7,10 @@ const { searchLimiter } = require('../middleware/rateLimiter');
 // All agent routes require agent authentication
 router.use(authenticateAgent);
 
+// Agent identity — who am I and who is my user?
+// This should be the FIRST call any agent makes
+router.get('/me', agentController.getAgentIdentity);
+
 // Search products & services
 router.post(
   '/search',

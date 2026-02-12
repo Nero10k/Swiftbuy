@@ -46,6 +46,7 @@ const authenticateAgent = async (req, res, next) => {
     req.agent = {
       id: decoded.agentId,
       name: decoded.agentName,
+      userId: decoded.userId || null,  // User this agent is authorized for
       permissions: decoded.permissions || ['search', 'purchase'],
     };
 

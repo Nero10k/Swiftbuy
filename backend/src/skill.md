@@ -25,6 +25,7 @@ Authorization: Bearer {{AGENT_TOKEN}}
 Here is the full flow you follow for every purchase:
 
 ```
+0. First call: GET /agent/me → get your user_id
 1. User asks for something ("find me a flight to Amsterdam")
 2. You search via Swiftbuy → get results
 3. You present 2-3 best options to the user with prices
@@ -42,9 +43,50 @@ Here is the full flow you follow for every purchase:
 
 ## Capabilities
 
+### 0. Get Agent Identity (CALL THIS FIRST)
+
+**This must be your very first API call.** It tells you who you are and which user you're shopping for. You'll get the `user_id` you need for all subsequent API calls.
+
+```
+GET /api/v1/agent/me
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "agent": {
+      "agentId": "agent_abc123",
+      "agentName": "My OpenClaw Agent",
+      "permissions": ["search", "purchase", "wallet_read"]
+    },
+    "user": {
+      "userId": "507f1f77bcf86cd799439011",
+      "name": "Nils",
+      "email": "nils@example.com",
+      "hasWallet": true,
+      "hasAddress": true,
+      "hasProfile": true,
+      "preferences": {
+        "requireApproval": true,
+        "maxAutoApprove": 25
+      }
+    },
+    "agentMessage": "Connected! I'm your Swiftbuy shopping agent. I'm linked to Nils's account and ready to search, compare, and purchase anything on the web for you.",
+    "agentInstructions": "You are now connected to Swiftbuy. The user_id for all API calls is: 507f1f77bcf86cd799439011. Start by greeting the user and asking how you can help them shop today."
+  }
+}
+```
+
+**Important:** Save the `user.userId` from the response — use it as `{{user_id}}` in all other API calls below.
+
+---
+
 ### 1. Get User Profile
 
-**Always call this first** at the start of a new conversation. It tells you the user's sizes, preferences, allergies, addresses, and wallet status.
+**Call this after `/me`** to get the user's sizes, preferences, allergies, and addresses for personalization.
 
 ```
 GET /api/v1/agent/users/{{user_id}}/profile

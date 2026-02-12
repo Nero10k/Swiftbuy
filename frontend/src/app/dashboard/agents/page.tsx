@@ -178,6 +178,7 @@ export default function AgentsPage() {
 
           <div className="space-y-3">
             <CredField label="Agent ID" value={newAgent.agentId} field="agentId" copiedField={copiedField} onCopy={handleCopy} />
+            <CredField label="User ID" value={newAgent.userId} field="userId" copiedField={copiedField} onCopy={handleCopy} />
             <CredField label="API Key" value={newAgent.apiKey} field="apiKey" copiedField={copiedField} onCopy={handleCopy} />
             <div>
               <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Bearer Token</label>

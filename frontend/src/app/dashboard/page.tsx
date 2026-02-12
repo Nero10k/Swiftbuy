@@ -321,6 +321,7 @@ export default function DashboardPage() {
           {/* Credential fields */}
           <div className="space-y-3">
             <CredentialField label="Agent ID" value={newAgent.agentId} field="agentId" copiedField={copiedField} onCopy={handleCopy} />
+            <CredentialField label="User ID" value={newAgent.userId} field="userId" copiedField={copiedField} onCopy={handleCopy} />
             <CredentialField label="API Key" value={newAgent.apiKey} field="apiKey" copiedField={copiedField} onCopy={handleCopy} />
             <div>
               <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
