@@ -72,7 +72,13 @@ class AmazonScraper extends BaseScraper {
 
             // URL
             const linkEl = item.querySelector('h2 a');
-            const url = linkEl ? `https://www.amazon.com${linkEl.getAttribute('href')}` : '';
+            let url = '';
+            if (linkEl) {
+              const href = linkEl.getAttribute('href') || '';
+              url = href.startsWith('http') ? href : `https://www.amazon.com${href}`;
+              // Trim tracking params for cleaner URLs
+              try { url = url.split('/ref=')[0]; } catch(e) {}
+            }
 
             // Price
             const priceWhole = item.querySelector('.a-price-whole')?.textContent?.trim() || '';
@@ -100,9 +106,10 @@ class AmazonScraper extends BaseScraper {
             // Free shipping / Prime
             const freeShipping = !!item.querySelector('.a-icon-prime, [aria-label*="FREE"]');
 
-            // Brand
-            const brandEl = item.querySelector('.a-size-base-plus.a-color-base, .a-row .a-size-base');
-            const brand = brandEl?.textContent?.trim() || '';
+            // Brand — avoid catching "X+ bought in past month" text
+            const brandEl = item.querySelector('.a-size-base-plus.a-color-base');
+            let brand = brandEl?.textContent?.trim() || '';
+            if (brand.match(/bought in past|sold in past|viewed in past/i)) brand = '';
 
             if (title && price) {
               results.push({

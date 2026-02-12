@@ -7,7 +7,7 @@ const productSchema = new mongoose.Schema(
     retailer: {
       type: String,
       required: true,
-      enum: ['amazon', 'walmart', 'target', 'bestbuy', 'ebay'],
+      // No enum — we support the entire web (Amazon, Walmart, Skyscanner, etc.)
     },
 
     // Product info
@@ -16,7 +16,7 @@ const productSchema = new mongoose.Schema(
     brand: { type: String },
     category: { type: String },
     images: [String],
-    url: { type: String, required: true },
+    url: { type: String, default: '' },
 
     // Pricing
     price: { type: Number, required: true },

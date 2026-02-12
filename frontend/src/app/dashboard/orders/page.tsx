@@ -30,23 +30,20 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Orders</h1>
-        <p className="text-gray-400 mt-1">All purchases made by your AI agents</p>
+        <h1 className="text-xl font-semibold text-white">Orders</h1>
+        <p className="text-sm text-gray-500 mt-1">All purchases made by your AI agents</p>
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {STATUS_FILTERS.map((filter) => (
           <button
             key={filter.value}
-            onClick={() => {
-              setStatusFilter(filter.value);
-              setPage(1);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            onClick={() => { setStatusFilter(filter.value); setPage(1); }}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               statusFilter === filter.value
                 ? 'bg-brand-600 text-white'
-                : 'bg-white/[0.03] text-gray-400 border border-white/5 hover:bg-white/[0.06] hover:text-white'
+                : 'text-gray-400 hover:bg-white/[0.04] hover:text-gray-200'
             }`}
           >
             {filter.label}
@@ -55,108 +52,71 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders table */}
-      <div className="bg-white/[0.03] rounded-xl border border-white/5 overflow-hidden">
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent mx-auto" />
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent mx-auto" />
           </div>
         ) : data?.orders?.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No orders found</p>
+          <div className="p-12 text-center">
+            <Package className="h-10 w-10 mx-auto text-gray-600 mb-3" />
+            <p className="text-sm text-gray-400">No orders found</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.02]">
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Product
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Order ID
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Retailer
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Amount
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
-                  Date
-                </th>
+              <tr className="border-b border-white/[0.06]">
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Product</th>
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Order ID</th>
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Retailer</th>
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-left px-6 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-white/[0.04]">
               {data?.orders?.map((order: any) => (
                 <tr key={order._id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-3.5">
                     <div className="flex items-center gap-3">
                       {order.product?.image ? (
-                        <img
-                          src={order.product.image}
-                          alt=""
-                          className="h-10 w-10 rounded-lg object-cover bg-white/5"
-                        />
+                        <img src={order.product.image} alt="" className="h-9 w-9 rounded-lg object-cover bg-white/[0.04]" />
                       ) : (
-                        <div className="h-10 w-10 rounded-lg bg-white/5 flex items-center justify-center">
-                          <Package className="h-5 w-5 text-gray-500" />
+                        <div className="h-9 w-9 rounded-lg bg-white/[0.04] flex items-center justify-center">
+                          <Package className="h-4 w-4 text-gray-600" />
                         </div>
                       )}
-                      <span className="text-sm font-medium text-white max-w-[200px] truncate">
-                        {order.product?.title}
-                      </span>
+                      <span className="text-sm text-white max-w-[200px] truncate">{order.product?.title}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400 font-mono">
-                    {order.orderId}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-400 capitalize">
-                    {order.product?.retailer}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-white">
-                    {formatUSD(order.payment?.amount)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        order.status
-                      )}`}
-                    >
+                  <td className="px-6 py-3.5 text-xs text-gray-500 font-mono">{order.orderId}</td>
+                  <td className="px-6 py-3.5 text-xs text-gray-400 capitalize">{order.product?.retailer}</td>
+                  <td className="px-6 py-3.5 text-sm font-medium text-white">{formatUSD(order.payment?.amount)}</td>
+                  <td className="px-6 py-3.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400">
-                    {formatDate(order.createdAt)}
-                  </td>
+                  <td className="px-6 py-3.5 text-xs text-gray-500">{formatDate(order.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
 
-        {/* Pagination */}
         {data?.pagination && data.pagination.pages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-white/5">
-            <p className="text-sm text-gray-400">
+          <div className="flex items-center justify-between px-6 py-3 border-t border-white/[0.06]">
+            <p className="text-xs text-gray-500">
               Page {data.pagination.page} of {data.pagination.pages} ({data.pagination.total} orders)
             </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-lg border border-white/10 text-gray-400 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-4 w-4" />
+            <div className="flex gap-1.5">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-1.5 rounded-lg border border-white/[0.06] text-gray-400 hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= data.pagination.pages}
-                className="p-2 rounded-lg border border-white/10 text-gray-400 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="h-4 w-4" />
+              <button onClick={() => setPage((p) => p + 1)} disabled={page >= data.pagination.pages}
+                className="p-1.5 rounded-lg border border-white/[0.06] text-gray-400 hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>

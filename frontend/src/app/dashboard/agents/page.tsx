@@ -17,7 +17,6 @@ import {
   EyeOff,
   FileText,
   ExternalLink,
-  ArrowRight,
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000';
@@ -65,12 +64,12 @@ export default function AgentsPage() {
   const skillUrl = `${API_BASE}/skill.md`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AI Agents</h1>
-          <p className="text-gray-400 mt-1">
-            Connect AI agents via OpenClaw&apos;s skill system
+          <h1 className="text-xl font-semibold text-white">AI Agents</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage your OpenClaw agent connections
           </p>
         </div>
         <button
@@ -78,83 +77,59 @@ export default function AgentsPage() {
             setShowRegister(true);
             setNewAgent(null);
           }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors"
         >
           <Plus className="h-4 w-4" />
           Register Agent
         </button>
       </div>
 
-      {/* Skill.md info card */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl border border-white/5 p-6">
+      {/* Skill.md info */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
         <div className="flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-brand-500/10 text-brand-400 shrink-0">
-            <FileText className="h-6 w-6" />
+          <div className="p-2.5 rounded-xl bg-brand-500/10 text-brand-400 shrink-0">
+            <FileText className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-white">
-              Connect via skill.md
-            </h2>
-            <p className="text-sm text-gray-400 mt-1 leading-relaxed">
-              Swiftbuy exposes a <code className="text-brand-400 bg-white/5 px-1 py-0.5 rounded text-xs">skill.md</code> file
-              that your OpenClaw agent reads to learn all available endpoints, authentication,
-              and behavior guidelines. Register an agent below to get your token, then point
-              your agent at the skill file.
+            <h2 className="text-sm font-semibold text-white">Skill File</h2>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              Your OpenClaw agent reads this file to auto-discover all endpoints,
+              authentication, and behavior guidelines.
             </p>
-
-            <div className="mt-4 flex items-center gap-3">
-              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg px-4 py-2.5 border border-white/10">
-                <code className="text-sm text-gray-300 font-mono truncate">
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-2 bg-black/30 rounded-lg px-3.5 py-2 border border-white/[0.06]">
+                <code className="text-xs text-gray-300 font-mono truncate">
                   {skillUrl}
                 </code>
-                <button
-                  onClick={() => handleCopy(skillUrl, 'skillUrl')}
-                  className="p-1.5 rounded-md hover:bg-white/10 transition-colors shrink-0"
-                >
-                  {copiedField === 'skillUrl' ? (
-                    <Check className="h-3.5 w-3.5 text-green-400" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5 text-gray-500" />
-                  )}
-                </button>
               </div>
+              <button
+                onClick={() => handleCopy(skillUrl, 'skillUrl')}
+                className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
+              >
+                {copiedField === 'skillUrl' ? (
+                  <Check className="h-3.5 w-3.5 text-green-400" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5 text-gray-500" />
+                )}
+              </button>
               <a
                 href={skillUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                View
+                <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
               </a>
-            </div>
-
-            {/* How it works steps */}
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-black/20 rounded-lg p-3 border border-white/5">
-                <p className="text-xs text-brand-400 font-semibold mb-1">Step 1</p>
-                <p className="text-sm text-gray-300">Register an agent below and get your Bearer token</p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3 border border-white/5">
-                <p className="text-xs text-brand-400 font-semibold mb-1">Step 2</p>
-                <p className="text-sm text-gray-300">
-                  Add the skill.md URL to your OpenClaw agent&apos;s skills
-                </p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3 border border-white/5">
-                <p className="text-xs text-brand-400 font-semibold mb-1">Step 3</p>
-                <p className="text-sm text-gray-300">Your agent reads the skill and can start shopping</p>
-              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* New agent registration */}
+      {/* Registration form */}
       {showRegister && !newAgent && (
-        <div className="bg-white/[0.03] rounded-xl border border-white/5 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Register New Agent</h2>
-          <p className="text-sm text-gray-400 mb-4">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6">
+          <h2 className="text-sm font-semibold text-white mb-1">Register New Agent</h2>
+          <p className="text-xs text-gray-500 mb-4">
             Create credentials for your OpenClaw agent to connect to Swiftbuy.
           </p>
           <div className="flex gap-3">
@@ -163,19 +138,20 @@ export default function AgentsPage() {
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
               placeholder="Agent name (e.g., My OpenClaw Agent)"
-              className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+              className="flex-1 px-4 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500/50 outline-none"
               onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+              autoFocus
             />
             <button
               onClick={handleRegister}
               disabled={registerMutation.isPending || !agentName.trim()}
-              className="px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors disabled:opacity-40"
             >
               {registerMutation.isPending ? 'Creating...' : 'Create'}
             </button>
             <button
               onClick={() => setShowRegister(false)}
-              className="px-4 py-2.5 text-gray-400 text-sm rounded-lg hover:bg-white/5 transition-colors"
+              className="px-4 py-2.5 text-gray-400 text-sm rounded-lg hover:bg-white/[0.04] transition-colors"
             >
               Cancel
             </button>
@@ -183,130 +159,60 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {/* New agent credentials (shown once!) */}
+      {/* Credentials (shown once) */}
       {newAgent && (
-        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-6">
-          <div className="flex items-start gap-3 mb-4">
+        <div className="rounded-xl border border-green-500/20 bg-green-500/[0.03] p-6 space-y-4">
+          <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-green-500/10 text-green-400">
               <Key className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-green-400">
+              <h2 className="text-sm font-semibold text-green-400">
                 Agent Created: {newAgent.agentName}
               </h2>
-              <p className="text-sm text-green-300/70 mt-1">
-                Save these credentials now — they will <strong>not</strong> be shown again.
+              <p className="text-xs text-gray-400 mt-0.5">
+                Save these credentials now — they will <strong className="text-gray-300">not</strong> be shown again.
               </p>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {/* Agent ID */}
+          <div className="space-y-3">
+            <CredField label="Agent ID" value={newAgent.agentId} field="agentId" copiedField={copiedField} onCopy={handleCopy} />
+            <CredField label="API Key" value={newAgent.apiKey} field="apiKey" copiedField={copiedField} onCopy={handleCopy} />
             <div>
-              <label className="text-xs font-semibold text-green-400 uppercase">Agent ID</label>
+              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Bearer Token</label>
               <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white">
-                  {newAgent.agentId}
+                <code className="flex-1 px-3.5 py-2.5 bg-black/30 border border-white/[0.06] rounded-lg text-xs font-mono text-white overflow-hidden">
+                  {showToken ? newAgent.token : `${newAgent.token.substring(0, 30)}...`}
                 </code>
-                <button
-                  onClick={() => handleCopy(newAgent.agentId, 'agentId')}
-                  className="p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  {copiedField === 'agentId' ? (
-                    <Check className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <Copy className="h-4 w-4 text-gray-500" />
-                  )}
+                <button onClick={() => setShowToken(!showToken)} className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors">
+                  {showToken ? <EyeOff className="h-3.5 w-3.5 text-gray-500" /> : <Eye className="h-3.5 w-3.5 text-gray-500" />}
                 </button>
-              </div>
-            </div>
-
-            {/* API Key */}
-            <div>
-              <label className="text-xs font-semibold text-green-400 uppercase">API Key</label>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white">
-                  {newAgent.apiKey}
-                </code>
-                <button
-                  onClick={() => handleCopy(newAgent.apiKey, 'apiKey')}
-                  className="p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  {copiedField === 'apiKey' ? (
-                    <Check className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <Copy className="h-4 w-4 text-gray-500" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Bearer Token */}
-            <div>
-              <label className="text-xs font-semibold text-green-400 uppercase">
-                Bearer Token (use in Authorization header)
-              </label>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white overflow-hidden">
-                  {showToken
-                    ? newAgent.token
-                    : `${newAgent.token.substring(0, 30)}...`}
-                </code>
-                <button
-                  onClick={() => setShowToken(!showToken)}
-                  className="p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  {showToken ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-500" />
-                  )}
-                </button>
-                <button
-                  onClick={() => handleCopy(newAgent.token, 'token')}
-                  className="p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  {copiedField === 'token' ? (
-                    <Check className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <Copy className="h-4 w-4 text-gray-500" />
-                  )}
+                <button onClick={() => handleCopy(newAgent.token, 'token')} className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors">
+                  {copiedField === 'token' ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Skill.md setup instructions */}
-          <div className="mt-6 bg-black/30 rounded-xl p-5 overflow-x-auto">
-            <p className="text-xs text-gray-400 mb-3 font-semibold uppercase">
-              Add to your OpenClaw agent
-            </p>
-            <pre className="text-sm font-mono text-gray-300 leading-relaxed">
-{`# In your OpenClaw agent config, add this skill:
-
-skill_url: ${skillUrl}
-
-# Set the environment variable for auth:
+          <div className="bg-black/40 rounded-xl p-4">
+            <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-2">Add to your OpenClaw agent</p>
+            <pre className="text-xs font-mono text-gray-300 leading-relaxed">
+{`skill_url: ${skillUrl}
 AGENT_TOKEN=${showToken ? newAgent.token : newAgent.token.substring(0, 20) + '...'}`}
             </pre>
-            <p className="text-xs text-gray-500 mt-3">
-              Your agent reads the skill.md to learn all endpoints, request formats, and behavior guidelines automatically.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 mt-4 p-3 bg-yellow-500/5 border border-yellow-500/10 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0" />
-            <p className="text-sm text-yellow-300/80">
-              Store these credentials securely. The API key and token cannot be retrieved later.
+          <div className="flex items-center gap-2 p-3 bg-yellow-500/[0.03] border border-yellow-500/10 rounded-lg">
+            <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+            <p className="text-xs text-yellow-300/80">
+              Store these credentials securely. They cannot be retrieved later.
             </p>
           </div>
 
           <button
-            onClick={() => {
-              setNewAgent(null);
-              setShowRegister(false);
-            }}
-            className="mt-4 px-5 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 transition-colors"
+            onClick={() => { setNewAgent(null); setShowRegister(false); }}
+            className="px-5 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 transition-colors"
           >
             I&apos;ve saved my credentials
           </button>
@@ -314,124 +220,105 @@ AGENT_TOKEN=${showToken ? newAgent.token : newAgent.token.substring(0, 20) + '..
       )}
 
       {/* Connected agents list */}
-      <div className="bg-white/[0.03] rounded-xl border border-white/5">
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-lg font-semibold text-white">Connected Agents</h2>
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/[0.06]">
+          <h2 className="text-sm font-semibold text-white">Connected Agents</h2>
         </div>
 
         {isLoading ? (
           <div className="p-8 text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent mx-auto" />
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent mx-auto" />
           </div>
         ) : data?.agents?.length === 0 ? (
-          <div className="p-12 text-center">
-            <Bot className="h-12 w-12 mx-auto text-gray-600 mb-3" />
-            <h3 className="text-lg font-medium text-white">No agents connected</h3>
-            <p className="text-gray-400 mt-1 mb-4">
-              Register an OpenClaw agent to start shopping autonomously
+          <div className="px-6 py-12 text-center">
+            <Bot className="h-10 w-10 mx-auto text-gray-600 mb-3" />
+            <p className="text-sm font-medium text-white">No agents connected</p>
+            <p className="text-xs text-gray-500 mt-1 mb-4">
+              Register an agent to start shopping autonomously
             </p>
             <button
-              onClick={() => {
-                setShowRegister(true);
-                setNewAgent(null);
-              }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors"
+              onClick={() => { setShowRegister(true); setNewAgent(null); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors"
             >
               <Plus className="h-4 w-4" />
-              Register Your First Agent
+              Register Agent
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-white/[0.04]">
             {data?.agents?.map((agent: any) => (
-              <div
-                key={agent.agentId}
-                className="flex items-center justify-between p-5 px-6"
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`p-2.5 rounded-xl ${
-                      agent.isActive
-                        ? 'bg-green-500/10 text-green-400'
-                        : 'bg-white/5 text-gray-500'
-                    }`}
-                  >
-                    <Bot className="h-5 w-5" />
+              <div key={agent.agentId} className="flex items-center justify-between px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${agent.isActive ? 'bg-green-500/10 text-green-400' : 'bg-white/[0.04] text-gray-500'}`}>
+                    <Bot className="h-4 w-4" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-white">{agent.agentName}</p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          agent.isActive
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-white/5 text-gray-500'
-                        }`}
-                      >
+                      <p className="text-sm font-medium text-white">{agent.agentName}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${agent.isActive ? 'bg-green-500/10 text-green-400' : 'bg-white/[0.04] text-gray-500'}`}>
                         {agent.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <p className="text-[11px] text-gray-500 mt-0.5">
                       <span className="font-mono">{agent.agentId}</span>
-                      {' · '}
-                      Connected {formatDate(agent.connectedAt)}
+                      {' · '}Connected {formatDate(agent.connectedAt)}
                     </p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      {agent.permissions?.map((perm: string) => (
-                        <span
-                          key={perm}
-                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-brand-500/10 text-brand-400 rounded-full"
-                        >
-                          <Shield className="h-3 w-3" />
-                          {perm}
-                        </span>
-                      ))}
-                    </div>
+                    {agent.permissions?.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {agent.permissions.map((perm: string) => (
+                          <span key={perm} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-brand-500/10 text-brand-400 rounded-full">
+                            <Shield className="h-2.5 w-2.5" />
+                            {perm}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  {agent.stats?.totalSearches > 0 && (
-                    <div className="text-right text-sm mr-4">
-                      <p className="text-white font-medium">
-                        {agent.stats.totalSearches} searches
-                      </p>
-                      <p className="text-gray-500">
-                        {agent.stats.totalPurchases} purchases
-                      </p>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => {
-                      if (confirm(`Disconnect agent "${agent.agentName}"?`)) {
-                        deleteMutation.mutate(agent.agentId);
-                      }
-                    }}
-                    className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Disconnect agent"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Disconnect agent "${agent.agentName}"?`)) {
+                      deleteMutation.mutate(agent.agentId);
+                    }
+                  }}
+                  className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="Disconnect agent"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Info: What agents can access */}
-      <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-blue-400 mb-2">
-          What does the skill.md give agents access to?
+      {/* Info */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          What agents can access
         </h3>
-        <p className="text-sm text-blue-300/70 leading-relaxed">
-          The skill file teaches agents how to read your <strong className="text-blue-300">shipping addresses</strong>,{' '}
-          <strong className="text-blue-300">clothing sizes</strong>, <strong className="text-blue-300">dietary preferences</strong>,{' '}
-          <strong className="text-blue-300">allergies</strong>, and <strong className="text-blue-300">wallet balance</strong> to make purchases on your behalf.
-          It also includes behavior guidelines — agents must present options before buying,
-          mention prices clearly, and respect your spending limits. Agents{' '}
-          <strong className="text-blue-300">cannot</strong> bypass approval workflows or access your password.
+        <p className="text-xs text-gray-500 leading-relaxed">
+          The skill file teaches agents how to read your shipping addresses, clothing sizes,
+          dietary preferences, allergies, and wallet balance to make purchases on your behalf.
+          Agents <strong className="text-gray-400">cannot</strong> bypass approval workflows or access your password.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function CredField({ label, value, field, copiedField, onCopy }: {
+  label: string; value: string; field: string; copiedField: string;
+  onCopy: (text: string, field: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div className="flex items-center gap-2 mt-1">
+        <code className="flex-1 px-3.5 py-2.5 bg-black/30 border border-white/[0.06] rounded-lg text-xs font-mono text-white">{value}</code>
+        <button onClick={() => onCopy(value, field)} className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] transition-colors">
+          {copiedField === field ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-gray-500" />}
+        </button>
       </div>
     </div>
   );

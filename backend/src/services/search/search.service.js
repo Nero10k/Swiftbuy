@@ -1,12 +1,21 @@
 const { getRedisClient } = require('../../config/redis');
 const Product = require('../../models/Product');
 const scraperManager = require('../scraper/scraper.manager');
+const queryProcessor = require('./query-processor');
 const logger = require('../../utils/logger');
 const { sanitizeQuery } = require('../../utils/helpers');
 
 /**
  * Search Service
- * Handles product search with caching and query processing
+ *
+ * Smart search engine that can find anything purchasable on the web.
+ *
+ * Flow:
+ * 1. Process the natural language query (intent detection, filter extraction)
+ * 2. Check cache for existing results
+ * 3. If miss, search the web via Google Shopping + retailer fallbacks
+ * 4. Save to cache + DB for intelligence/learning
+ * 5. Return ranked, deduplicated results
  */
 class SearchService {
   constructor() {
@@ -14,74 +23,97 @@ class SearchService {
   }
 
   /**
-   * Search for products
-   * 1. Check cache
-   * 2. If miss, scrape retailers
-   * 3. Save to cache + DB
-   * 4. Return results
+   * Search for anything purchasable on the web
    *
-   * @param {string} query - Natural language search query
+   * @param {string} query - Natural language search query (e.g., "cheap wireless headphones under $50")
    * @param {Object} filters - { maxPrice, minPrice, minRating, category, retailers }
    * @param {number} limit - Max results
+   * @param {Object} userPreferences - User's profile preferences (sizes, brands, etc.)
    * @returns {Object} { products, meta }
    */
-  async search(query, filters = {}, limit = 10) {
-    const cleanQuery = sanitizeQuery(query);
-    if (!cleanQuery) {
+  async search(query, filters = {}, limit = 10, userPreferences = {}) {
+    const rawQuery = sanitizeQuery(query);
+    if (!rawQuery) {
       throw new Error('Search query is required');
     }
 
-    logger.info(`Search request: "${cleanQuery}"`, { filters, limit });
+    // Step 1: Smart query processing
+    const processed = queryProcessor.process(rawQuery, userPreferences);
 
-    // 1. Check cache
-    const cacheKey = this._buildCacheKey(cleanQuery, filters);
+    // Merge extracted filters with explicit filters (explicit takes precedence)
+    const mergedFilters = {
+      ...processed.filters,
+      ...filters,
+    };
+
+    // Use the cleaned/enriched query for searching
+    const searchQuery = processed.enrichedQuery || processed.cleanQuery;
+
+    logger.info(`Smart search: "${rawQuery}" → "${searchQuery}"`, {
+      intent: processed.intent,
+      category: processed.category,
+      filters: mergedFilters,
+    });
+
+    // Step 2: Check cache
+    const cacheKey = this._buildCacheKey(searchQuery, mergedFilters);
     const cached = await this._getFromCache(cacheKey);
 
     if (cached) {
-      logger.info(`Cache hit for "${cleanQuery}"`);
+      logger.info(`Cache hit for "${searchQuery}" (${cached.length} products)`);
       return {
         products: cached,
         meta: {
           source: 'cache',
-          query: cleanQuery,
+          query: rawQuery,
+          processedQuery: searchQuery,
+          intent: processed.intent,
+          category: processed.category,
           resultCount: cached.length,
           retailers: [...new Set(cached.map((p) => p.retailer))],
         },
       };
     }
 
-    // 2. Scrape retailers
+    // Step 3: Search the web (routed by intent)
     let products;
     if (filters.retailers && filters.retailers.length > 0) {
-      // Search specific retailers
+      // Specific retailer search
       const results = await Promise.allSettled(
         filters.retailers.map((r) =>
-          scraperManager.searchRetailer(r, cleanQuery, filters, limit)
+          scraperManager.searchRetailer(r, searchQuery, mergedFilters, limit)
         )
       );
       products = results
         .filter((r) => r.status === 'fulfilled')
         .flatMap((r) => r.value);
     } else {
-      // Search all retailers
-      products = await scraperManager.searchAll(cleanQuery, filters, limit);
+      // Universal search — intelligently routed by intent
+      // Flights → Google Flights, Hotels → Google Hotels, Products → Google Shopping + Amazon
+      products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent);
     }
 
-    // 3. Save to cache + DB
+    // Step 4: Save to cache + DB
     if (products.length > 0) {
       await this._saveToCache(cacheKey, products);
-      await this._saveToDB(products, cleanQuery);
+      await this._saveToDB(products, rawQuery);
     }
 
-    // 4. Return results
+    // Step 5: Return results
     return {
       products: products.slice(0, limit),
       meta: {
         source: 'fresh',
-        query: cleanQuery,
+        query: rawQuery,
+        processedQuery: searchQuery,
+        intent: processed.intent,
+        category: processed.category,
+        filters: mergedFilters,
         resultCount: products.length,
         retailers: [...new Set(products.map((p) => p.retailer))],
+        sources: ['google-shopping', ...(products.length < 3 ? ['amazon'] : [])],
         scrapedAt: new Date().toISOString(),
+        personalizedFor: null,
       },
     };
   }
@@ -162,5 +194,3 @@ class SearchService {
 }
 
 module.exports = new SearchService();
-
-

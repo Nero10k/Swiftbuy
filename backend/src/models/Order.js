@@ -19,11 +19,13 @@ const orderSchema = new mongoose.Schema(
     // What
     product: {
       productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+      externalId: { type: String },
       title: { type: String, required: true },
       price: { type: Number, required: true },
       retailer: { type: String, required: true },
       url: { type: String },
       image: { type: String },
+      category: { type: String, default: '' },
     },
 
     // Where
@@ -90,6 +92,8 @@ const orderSchema = new mongoose.Schema(
       agentConversationId: { type: String },
       executionTimeMs: { type: Number },
       retryCount: { type: Number, default: 0 },
+      source: { type: String },
+      failureReason: { type: String },
     },
 
     // Status history

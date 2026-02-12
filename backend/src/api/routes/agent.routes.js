@@ -7,7 +7,7 @@ const { searchLimiter } = require('../middleware/rateLimiter');
 // All agent routes require agent authentication
 router.use(authenticateAgent);
 
-// Search products
+// Search products & services
 router.post(
   '/search',
   requirePermission('search'),
@@ -22,10 +22,30 @@ router.post(
   agentController.initiatePurchase
 );
 
+// Approve order (in-chat approval — agent approves on behalf of user)
+router.post(
+  '/orders/:orderId/approve',
+  requirePermission('purchase'),
+  agentController.approveOrder
+);
+
+// Reject order (in-chat rejection — agent rejects on behalf of user)
+router.post(
+  '/orders/:orderId/reject',
+  requirePermission('purchase'),
+  agentController.rejectOrder
+);
+
 // Get order status
 router.get(
   '/orders/:orderId',
   agentController.getOrderStatus
+);
+
+// Get user's recent orders
+router.get(
+  '/users/:userId/orders',
+  agentController.getUserOrders
 );
 
 // Check wallet balance
@@ -42,4 +62,3 @@ router.get(
 );
 
 module.exports = router;
-

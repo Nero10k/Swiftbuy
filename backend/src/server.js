@@ -9,14 +9,19 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDatabase();
 
-    // Connect to Redis
-    connectRedis();
+    // Connect to Redis (optional — don't crash if unavailable)
+    try {
+      connectRedis();
+    } catch (redisError) {
+      logger.warn(`Redis not available, running without cache: ${redisError.message}`);
+    }
 
     // Start Express server
-    app.listen(config.port, () => {
-      logger.info(`Swiftbuy API server running on port ${config.port}`);
+    const port = process.env.PORT || config.port;
+    app.listen(port, '0.0.0.0', () => {
+      logger.info(`Swiftbuy API server running on port ${port}`);
       logger.info(`Environment: ${config.env}`);
-      logger.info(`Health check: http://localhost:${config.port}/health`);
+      logger.info(`Health check: http://localhost:${port}/health`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

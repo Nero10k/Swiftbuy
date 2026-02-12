@@ -146,7 +146,7 @@ export default function LandingPage() {
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight">
-              Your AI agent can now{' '}
+              Your Openclaw agent can now{' '}
               <span className="gradient-text from-brand-400 to-purple-400">
                 buy anything
               </span>{' '}
@@ -156,8 +156,15 @@ export default function LandingPage() {
             <p className="mt-6 text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Swiftbuy is the middleware that lets any AI agent search, compare, and
               purchase anything — products, flights, hotels, food, tickets — powered by{' '}
-              <span className="text-white font-medium">USDC</span> with automatic
-              off-ramping.
+              <a
+                href="https://agents.karmapay.xyz/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white font-medium underline decoration-brand-400/50 underline-offset-2 hover:decoration-brand-400 transition-colors"
+              >
+                Karma Agent Wallet
+              </a>{' '}
+              with automatic off-ramping.
             </p>
 
             {/* CTAs */}
@@ -181,7 +188,9 @@ export default function LandingPage() {
             </div>
 
             <p className="mt-5 text-sm text-gray-500">
-              No credit card needed · USDC payments · Products, flights, hotels & more · Any AI agent
+              No credit card needed · Powered by{' '}
+              <a href="https://agents.karmapay.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-300 transition-colors">Karma Agent Wallet</a>
+              {' '}· Products, flights, hotels & more · Any AI agent
             </p>
           </div>
 
@@ -231,7 +240,7 @@ export default function LandingPage() {
                 <div className="flex gap-3">
                   <span className="text-green-400 shrink-0">Agent:</span>
                   <span className="text-gray-500">
-                    ✅ Flight booked! $512.00 USDC → off-ramped → confirmed on United.
+                    ✅ Flight booked! $512.00 via Karma Wallet → off-ramped → confirmed on United.
                     <br />
                     <span className="text-gray-600">Conf: UA-7291840 · Searching hotels now...</span>
                   </span>
@@ -291,8 +300,8 @@ export default function LandingPage() {
             <StepCard
               step={3}
               icon={CreditCard}
-              title="USDC Off-Ramps"
-              description="Your USDC is automatically converted to fiat to pay the provider. No cards needed."
+              title="Karma Pays"
+              description="Your Karma Agent Wallet handles USDC off-ramping to fiat automatically. No cards needed."
               color="green"
             />
             <StepCard
@@ -322,7 +331,7 @@ export default function LandingPage() {
               <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
               <div className="flex flex-col gap-3">
                 <ArchBlock icon={Globe} label="Providers" sublabel="Retailers · Airlines · Hotels" />
-                <ArchBlock icon={Wallet} label="Wallet API" sublabel="USDC → Fiat" />
+                <ArchBlock icon={Wallet} label="Karma Wallet" sublabel="USDC → Fiat" />
               </div>
             </div>
           </div>
@@ -377,8 +386,8 @@ export default function LandingPage() {
             />
             <FeatureCard
               icon={Wallet}
-              title="USDC Wallet Integration"
-              description="Pay with USDC from your virtual wallet. Automatic off-ramping to fiat at checkout — no credit cards."
+              title="Karma Agent Wallet"
+              description="Pay with USDC through Karma Agent Wallet. Automatic off-ramping to fiat at checkout — no credit cards."
             />
             <FeatureCard
               icon={Shield}
@@ -563,8 +572,8 @@ export default function LandingPage() {
               <p className="text-brand-200 mt-2">Transparent</p>
             </div>
             <div>
-              <p className="text-4xl md:text-5xl font-bold">USDC</p>
-              <p className="text-brand-200 mt-2">Native Payments</p>
+              <p className="text-4xl md:text-5xl font-bold">Karma</p>
+              <p className="text-brand-200 mt-2">Agent Wallet</p>
             </div>
             <div>
               <p className="text-4xl md:text-5xl font-bold">&lt;30s</p>
@@ -658,7 +667,11 @@ export default function LandingPage() {
               © {new Date().getFullYear()} Swiftbuy. All rights reserved.
             </p>
             <p className="text-sm text-gray-600">
-              Powered by USDC · Built for the AI agent economy
+              Powered by{' '}
+              <a href="https://agents.karmapay.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 transition-colors">
+                Karma Agent Wallet
+              </a>{' '}
+              · Built for the AI agent economy
             </p>
           </div>
         </div>

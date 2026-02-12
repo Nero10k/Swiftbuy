@@ -39,6 +39,7 @@ const config = {
   scraping: {
     timeoutMs: parseInt(process.env.SCRAPE_TIMEOUT_MS, 10) || 30000,
     maxConcurrent: parseInt(process.env.MAX_CONCURRENT_SCRAPES, 10) || 3,
+    serperApiKey: process.env.SERPER_API_KEY || '',
   },
 
   // Purchase

@@ -1,5 +1,6 @@
 const purchaseService = require('../../services/purchase/purchase.service');
 const learningService = require('../../services/intelligence/learning.service');
+const notificationService = require('../../services/notification/notification.service');
 const User = require('../../models/User');
 const AgentSession = require('../../models/AgentSession');
 const Transaction = require('../../models/Transaction');
@@ -432,6 +433,50 @@ const deleteAgent = async (req, res, next) => {
   }
 };
 
+/**
+ * User: Get notifications
+ * GET /api/v1/user/notifications
+ */
+const getNotifications = async (req, res, next) => {
+  try {
+    const { limit = 20, unread_only } = req.query;
+    const result = await notificationService.getNotifications(req.user._id, {
+      limit: parseInt(limit),
+      unreadOnly: unread_only === 'true',
+    });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * User: Mark notification as read
+ * POST /api/v1/user/notifications/:notificationId/read
+ */
+const markNotificationRead = async (req, res, next) => {
+  try {
+    const { notificationId } = req.params;
+    await notificationService.markAsRead(req.user._id, notificationId);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * User: Mark all notifications as read
+ * POST /api/v1/user/notifications/read-all
+ */
+const markAllNotificationsRead = async (req, res, next) => {
+  try {
+    const result = await notificationService.markAllAsRead(req.user._id);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getOrders,
@@ -445,5 +490,8 @@ module.exports = {
   registerAgent,
   getAgents,
   deleteAgent,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 };
 

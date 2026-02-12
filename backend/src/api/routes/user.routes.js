@@ -34,5 +34,10 @@ router.get('/agents', userController.getAgents);
 router.post('/agents', userController.registerAgent);
 router.delete('/agents/:agentId', userController.deleteAgent);
 
+// Notifications
+router.get('/notifications', userController.getNotifications);
+router.post('/notifications/:notificationId/read', userController.markNotificationRead);
+router.post('/notifications/read-all', userController.markAllNotificationsRead);
+
 module.exports = router;
 
