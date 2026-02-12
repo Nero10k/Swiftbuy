@@ -32,10 +32,16 @@ app.use('/api/', apiLimiter);
 
 // Health check
 app.get('/health', (req, res) => {
+  const config = require('./config');
   res.json({
     status: 'ok',
     service: 'swiftbuy',
     timestamp: new Date().toISOString(),
+    environment: config.env,
+    search: {
+      serperConfigured: !!process.env.SERPER_API_KEY,
+      playwrightEnabled: config.env === 'development',
+    },
   });
 });
 
