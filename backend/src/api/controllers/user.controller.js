@@ -216,6 +216,119 @@ const addAddress = async (req, res, next) => {
 };
 
 /**
+ * User: Update a shipping address
+ * PATCH /api/v1/user/addresses/:addressId
+ */
+const updateAddress = async (req, res, next) => {
+  try {
+    const { addressId } = req.params;
+    const { label, fullName, street, city, state, zipCode, country, phone, isDefault } = req.body;
+
+    const user = await User.findById(req.user._id);
+    const address = user.shippingAddresses.id(addressId);
+
+    if (!address) {
+      throw new AppError('Address not found', 404, 'ADDRESS_NOT_FOUND');
+    }
+
+    // If setting as default, unset existing defaults
+    if (isDefault) {
+      user.shippingAddresses.forEach((addr) => {
+        addr.isDefault = false;
+      });
+    }
+
+    // Update fields
+    if (label !== undefined) address.label = label;
+    if (fullName !== undefined) address.fullName = fullName;
+    if (street !== undefined) address.street = street;
+    if (city !== undefined) address.city = city;
+    if (state !== undefined) address.state = state;
+    if (zipCode !== undefined) address.zipCode = zipCode;
+    if (country !== undefined) address.country = country;
+    if (phone !== undefined) address.phone = phone;
+    if (isDefault !== undefined) address.isDefault = isDefault;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: { addresses: user.shippingAddresses },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * User: Delete a shipping address
+ * DELETE /api/v1/user/addresses/:addressId
+ */
+const deleteAddress = async (req, res, next) => {
+  try {
+    const { addressId } = req.params;
+
+    const user = await User.findById(req.user._id);
+    const address = user.shippingAddresses.id(addressId);
+
+    if (!address) {
+      throw new AppError('Address not found', 404, 'ADDRESS_NOT_FOUND');
+    }
+
+    const wasDefault = address.isDefault;
+    address.deleteOne();
+
+    // If deleted address was default and there are remaining addresses, set first as default
+    if (wasDefault && user.shippingAddresses.length > 0) {
+      user.shippingAddresses[0].isDefault = true;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: { addresses: user.shippingAddresses },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * User: Update profile (sizes, gender, notes, dietary, allergies)
+ * PATCH /api/v1/user/profile
+ */
+const updateProfile = async (req, res, next) => {
+  try {
+    const { phone, gender, shirtSize, pantsSize, shoeSize, dressSize, notes, dietaryPreferences, allergies } = req.body;
+
+    const updates = {};
+    if (phone !== undefined) updates['profile.phone'] = phone;
+    if (gender !== undefined) updates['profile.gender'] = gender;
+    if (shirtSize !== undefined) updates['profile.sizes.shirtSize'] = shirtSize;
+    if (pantsSize !== undefined) updates['profile.sizes.pantsSize'] = pantsSize;
+    if (shoeSize !== undefined) updates['profile.sizes.shoeSize'] = shoeSize;
+    if (dressSize !== undefined) updates['profile.sizes.dressSize'] = dressSize;
+    if (notes !== undefined) updates['profile.notes'] = notes;
+    if (dietaryPreferences !== undefined) updates['profile.dietaryPreferences'] = dietaryPreferences;
+    if (allergies !== undefined) updates['profile.allergies'] = allergies;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      success: true,
+      data: { user: user.toJSON() },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * User: Connect wallet
  * POST /api/v1/user/wallet/connect
  */
@@ -491,6 +604,9 @@ module.exports = {
   getTransactions,
   updateSettings,
   addAddress,
+  updateAddress,
+  deleteAddress,
+  updateProfile,
   connectWallet,
   completeOnboarding,
   registerAgent,

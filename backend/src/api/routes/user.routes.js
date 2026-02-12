@@ -25,6 +25,11 @@ router.patch('/settings', userController.updateSettings);
 
 // Addresses
 router.post('/addresses', userController.addAddress);
+router.patch('/addresses/:addressId', userController.updateAddress);
+router.delete('/addresses/:addressId', userController.deleteAddress);
+
+// Profile
+router.patch('/profile', userController.updateProfile);
 
 // Wallet
 router.post('/wallet/connect', userController.connectWallet);

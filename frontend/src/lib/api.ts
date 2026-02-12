@@ -56,6 +56,12 @@ export const userApi = {
     api.patch('/user/settings', data),
   addAddress: (data: Record<string, unknown>) =>
     api.post('/user/addresses', data),
+  updateAddress: (addressId: string, data: Record<string, unknown>) =>
+    api.patch(`/user/addresses/${addressId}`, data),
+  deleteAddress: (addressId: string) =>
+    api.delete(`/user/addresses/${addressId}`),
+  updateProfile: (data: Record<string, unknown>) =>
+    api.patch('/user/profile', data),
   connectWallet: (walletAddress: string) =>
     api.post('/user/wallet/connect', { walletAddress }),
   completeOnboarding: (data: Record<string, unknown>) =>
