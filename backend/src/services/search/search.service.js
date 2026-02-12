@@ -148,6 +148,7 @@ class SearchService {
   async _getFromCache(key) {
     try {
       const redis = getRedisClient();
+      if (!redis) return null; // Redis not available — skip cache
       const cached = await redis.get(key);
       return cached ? JSON.parse(cached) : null;
     } catch (error) {
@@ -162,6 +163,7 @@ class SearchService {
   async _saveToCache(key, products) {
     try {
       const redis = getRedisClient();
+      if (!redis) return; // Redis not available — skip cache
       await redis.setex(key, this.CACHE_TTL, JSON.stringify(products));
     } catch (error) {
       logger.warn('Cache write error:', error.message);
