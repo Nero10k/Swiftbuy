@@ -60,56 +60,6 @@ app.get('/skill.md', (req, res) => {
   res.send(skillContent);
 });
 
-// Debug: test search (temporary — remove after debugging)
-app.get('/debug/test1', async (req, res) => {
-  // Step 1: Just test if outbound HTTP works at all
-  const start = Date.now();
-  try {
-    const resp = await fetch('https://httpbin.org/get', { signal: AbortSignal.timeout(5000) });
-    const data = await resp.json();
-    res.json({ ok: true, ms: Date.now() - start, ip: data.origin });
-  } catch (e) {
-    res.json({ ok: false, ms: Date.now() - start, error: e.message });
-  }
-});
-
-app.get('/debug/test2', async (req, res) => {
-  // Step 2: Test Serper API directly
-  const start = Date.now();
-  const key = process.env.SERPER_API_KEY;
-  if (!key) return res.json({ ok: false, error: 'No SERPER_API_KEY' });
-  
-  try {
-    const resp = await fetch('https://google.serper.dev/shopping', {
-      method: 'POST',
-      headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: 'headphones', gl: 'us', hl: 'en', num: 3 }),
-      signal: AbortSignal.timeout(10000),
-    });
-    const ms = Date.now() - start;
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return res.json({ ok: false, ms, status: resp.status, error: errText });
-    }
-    const data = await resp.json();
-    res.json({ ok: true, ms, results: (data.shopping || []).length, first: data.shopping?.[0]?.title });
-  } catch (e) {
-    res.json({ ok: false, ms: Date.now() - start, error: e.message });
-  }
-});
-
-app.get('/debug/test3', async (req, res) => {
-  // Step 3: Test full search pipeline
-  const start = Date.now();
-  try {
-    const searchService = require('./services/search/search.service');
-    const results = await searchService.search('headphones', {}, 3);
-    res.json({ ok: true, ms: Date.now() - start, count: results.products.length, source: results.meta.source });
-  } catch (e) {
-    res.json({ ok: false, ms: Date.now() - start, error: e.message, stack: e.stack?.split('\n').slice(0, 5) });
-  }
-});
-
 // API routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/agent', agentRoutes);
