@@ -5,6 +5,7 @@ const learningService = require('../../services/intelligence/learning.service');
 const User = require('../../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { getUserCountry, getGeoForCountry } = require('../../utils/geo');
 
 /**
  * Agent: Search products & services
@@ -23,7 +24,13 @@ const searchProducts = async (req, res, next) => {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    const results = await searchService.search(query, filters, limit);
+    // Determine the user's country from their shipping address for geo-aware search
+    const userCountry = getUserCountry(user.shippingAddresses);
+    const geo = getGeoForCountry(userCountry);
+
+    logger.info(`Geo-aware search: user country=${userCountry} → gl=${geo.gl}, hl=${geo.hl}, currency=${geo.currency}`);
+
+    const results = await searchService.search(query, filters, limit, {}, geo);
 
     // Score products based on user preferences
     const scoredProducts = await Promise.all(
@@ -36,20 +43,22 @@ const searchProducts = async (req, res, next) => {
     scoredProducts.sort((a, b) => b.relevanceScore - a.relevanceScore);
     await learningService.recordSearch(user_id, query, filters);
 
-    logger.info(`Agent ${req.agent.id} searched for "${query}" for user ${user_id}`);
+    logger.info(`Agent ${req.agent.id} searched for "${query}" for user ${user_id} (${geo.name})`);
 
-    // Build agent-friendly summary
+    // Build agent-friendly summary with correct currency
+    const currSymbol = geo.currencySymbol;
     const topResults = scoredProducts.slice(0, 3);
     let agentSummary = '';
     if (scoredProducts.length === 0) {
       agentSummary = `No results found for "${query}". Try rephrasing or broadening the search.`;
     } else {
       const items = topResults.map((p, i) => {
-        let line = `${i + 1}. ${p.title} — $${p.price || 'N/A'} from ${p.retailer || 'Web'}`;
+        const priceDisplay = p.price ? `${currSymbol}${p.price}` : 'N/A';
+        let line = `${i + 1}. ${p.title} — ${priceDisplay} from ${p.retailer || 'Web'}`;
         if (p.rating) line += ` (${p.rating} stars)`;
         return line;
       });
-      agentSummary = `Found ${scoredProducts.length} results for "${query}". Top options: ${items.join(' | ')}`;
+      agentSummary = `Found ${scoredProducts.length} results for "${query}" (${geo.name}). Top options: ${items.join(' | ')}`;
     }
 
     res.json({
@@ -59,11 +68,17 @@ const searchProducts = async (req, res, next) => {
         meta: {
           ...results.meta,
           personalizedFor: user_id,
+          geo: {
+            country: userCountry,
+            countryName: geo.name,
+            currency: geo.currency,
+            currencySymbol: geo.currencySymbol,
+          },
         },
         // Agent instructions — tells the agent what to say to the human
         agentMessage: agentSummary,
         agentInstructions: scoredProducts.length > 0
-          ? 'Present the top 2-3 options to the user with prices. Ask which one they\'d like, or if they want to refine the search. If they pick one, use the /purchase endpoint with the product data.'
+          ? `Present the top 2-3 options to the user with prices in ${geo.currency} (${geo.currencySymbol}). Ask which one they'd like, or if they want to refine the search. If they pick one, use the /purchase endpoint with the product data.`
           : 'Tell the user no results were found and suggest alternative search terms.',
       },
     });

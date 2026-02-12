@@ -134,19 +134,21 @@ POST /api/v1/agent/search
 
 **The response includes `agentMessage`** — a pre-formatted summary you can relay to the user. It also includes `agentInstructions` for what to do next.
 
+**🌍 Country-Aware Search:** Results are automatically localized based on the user's shipping address country. A user in Romania gets results from emag.ro, altex.ro, etc. in RON. A user in Netherlands gets results from bol.com, coolblue.nl, etc. in EUR. The response `meta.geo` tells you the currency used. **Always show prices in the local currency** from the response — never assume USD.
+
 **How to present results to the user:**
 
-When you get results, present the **top 2-3 options** clearly:
+When you get results, present the **top 2-3 options** clearly. Use the currency from the response (`meta.geo.currencySymbol`):
 
 > Here's what I found for flights from Bucharest to Amsterdam on Feb 14:
 >
-> 1. **Wizz Air** — $55, direct, 3h 15m, departs 6:30 AM
-> 2. **KLM** — $142, direct, 3h 10m, departs 11:45 AM  
-> 3. **Ryanair** — $48, 1 stop (Budapest), 5h 40m, departs 8:00 AM
+> 1. **Wizz Air** — €49, direct, 3h 15m, departs 6:30 AM
+> 2. **KLM** — €129, direct, 3h 10m, departs 11:45 AM  
+> 3. **Ryanair** — €42, 1 stop (Budapest), 5h 40m, departs 8:00 AM
 >
-> The Wizz Air flight is the best value — direct and under $60. Want me to book it?
+> The Wizz Air flight is the best value — direct and under €50. Want me to book it?
 
-Always include: **name/title, price, key detail** (for flights: duration/stops, for products: rating/retailer, for hotels: location/stars).
+Always include: **name/title, price (in local currency), key detail** (for flights: duration/stops, for products: rating/retailer, for hotels: location/stars).
 
 ---
 

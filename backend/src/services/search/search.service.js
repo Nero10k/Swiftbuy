@@ -29,9 +29,10 @@ class SearchService {
    * @param {Object} filters - { maxPrice, minPrice, minRating, category, retailers }
    * @param {number} limit - Max results
    * @param {Object} userPreferences - User's profile preferences (sizes, brands, etc.)
+   * @param {Object} geo - { gl, hl, currency, currencySymbol, name } from geo.js
    * @returns {Object} { products, meta }
    */
-  async search(query, filters = {}, limit = 10, userPreferences = {}) {
+  async search(query, filters = {}, limit = 10, userPreferences = {}, geo = null) {
     const rawQuery = sanitizeQuery(query);
     if (!rawQuery) {
       throw new Error('Search query is required');
@@ -53,10 +54,11 @@ class SearchService {
       intent: processed.intent,
       category: processed.category,
       filters: mergedFilters,
+      geo: geo ? { gl: geo.gl, currency: geo.currency } : 'default',
     });
 
-    // Step 2: Check cache
-    const cacheKey = this._buildCacheKey(searchQuery, mergedFilters);
+    // Step 2: Check cache (include geo in cache key)
+    const cacheKey = this._buildCacheKey(searchQuery, mergedFilters, geo);
     const cached = await this._getFromCache(cacheKey);
 
     if (cached) {
@@ -90,7 +92,8 @@ class SearchService {
     } else {
       // Universal search — intelligently routed by intent
       // Flights → Google Flights, Hotels → Google Hotels, Products → Google Shopping + Amazon
-      products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent);
+      // Geo params ensure results are localized to the user's country
+      products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent, geo);
     }
 
     // Step 4: Save to cache + DB
@@ -114,6 +117,7 @@ class SearchService {
         sources: ['google-shopping', ...(products.length < 3 ? ['amazon'] : [])],
         scrapedAt: new Date().toISOString(),
         personalizedFor: null,
+        geo: geo ? { gl: geo.gl, hl: geo.hl, currency: geo.currency } : null,
       },
     };
   }
@@ -130,14 +134,15 @@ class SearchService {
   }
 
   /**
-   * Build cache key from query + filters
+   * Build cache key from query + filters + geo
    */
-  _buildCacheKey(query, filters) {
+  _buildCacheKey(query, filters, geo = null) {
     const filterStr = JSON.stringify({
       maxPrice: filters.maxPrice,
       minPrice: filters.minPrice,
       minRating: filters.minRating,
       retailers: filters.retailers,
+      gl: geo?.gl || 'us',
     });
     return `search:${query.toLowerCase().replace(/\s+/g, '_')}:${Buffer.from(filterStr).toString('base64').substring(0, 20)}`;
   }

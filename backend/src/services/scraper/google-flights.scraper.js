@@ -28,14 +28,24 @@ class GoogleTravelScraper {
 
   /**
    * Search for flights
+   *
+   * @param {string} query - Search query
+   * @param {Object} filters - Price filters
+   * @param {number} limit - Max results
+   * @param {Object} geo - { gl, hl, currency, currencySymbol } for country-aware search
    */
-  async searchFlights(query, filters = {}, limit = 10) {
+  async searchFlights(query, filters = {}, limit = 10, geo = null) {
     if (!this.apiKey) {
       throw new Error('SERPER_API_KEY not configured — get free key at https://serper.dev');
     }
 
     try {
-      logger.info(`Google Flights: searching "${query}"`);
+      const gl = geo?.gl || 'us';
+      const hl = geo?.hl || 'en';
+      const currency = geo?.currency || 'USD';
+      const currencySymbol = geo?.currencySymbol || '$';
+
+      logger.info(`Google Flights: searching "${query}" (gl=${gl}, hl=${hl})`);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -48,8 +58,8 @@ class GoogleTravelScraper {
         },
         body: JSON.stringify({
           q: query,
-          gl: 'us',
-          hl: 'en',
+          gl,
+          hl,
           num: 20,
         }),
         signal: controller.signal,
@@ -66,13 +76,13 @@ class GoogleTravelScraper {
 
       // Extract from flights section (Google Flights cards)
       if (data.flights && Array.isArray(data.flights)) {
-        const flightResults = data.flights.map((flight) => this._normalizeFlightFromCard(flight));
+        const flightResults = data.flights.map((flight) => this._normalizeFlightFromCard(flight, currency, currencySymbol));
         results.push(...flightResults);
       }
 
       // Also extract from knowledge graph / answer box
       if (data.knowledgeGraph) {
-        const kgResult = this._extractFlightFromKG(data.knowledgeGraph);
+        const kgResult = this._extractFlightFromKG(data.knowledgeGraph, currency, currencySymbol);
         if (kgResult) results.push(kgResult);
       }
 
@@ -80,7 +90,7 @@ class GoogleTravelScraper {
       if (data.organic && Array.isArray(data.organic)) {
         const organicFlights = data.organic
           .filter((r) => this._isFlightResult(r))
-          .map((r) => this._normalizeFlightFromOrganic(r));
+          .map((r) => this._normalizeFlightFromOrganic(r, currency, currencySymbol));
         results.push(...organicFlights);
       }
 
@@ -98,13 +108,18 @@ class GoogleTravelScraper {
   /**
    * Search for hotels
    */
-  async searchHotels(query, filters = {}, limit = 10) {
+  async searchHotels(query, filters = {}, limit = 10, geo = null) {
     if (!this.apiKey) {
       throw new Error('SERPER_API_KEY not configured — get free key at https://serper.dev');
     }
 
     try {
-      logger.info(`Google Hotels: searching "${query}"`);
+      const gl = geo?.gl || 'us';
+      const hl = geo?.hl || 'en';
+      const currency = geo?.currency || 'USD';
+      const currencySymbol = geo?.currencySymbol || '$';
+
+      logger.info(`Google Hotels: searching "${query}" (gl=${gl}, hl=${hl})`);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -117,8 +132,8 @@ class GoogleTravelScraper {
         },
         body: JSON.stringify({
           q: query,
-          gl: 'us',
-          hl: 'en',
+          gl,
+          hl,
           num: 20,
         }),
         signal: controller.signal,
@@ -137,13 +152,13 @@ class GoogleTravelScraper {
       if (data.organic && Array.isArray(data.organic)) {
         const hotelResults = data.organic
           .filter((r) => this._isHotelResult(r))
-          .map((r) => this._normalizeHotelFromOrganic(r));
+          .map((r) => this._normalizeHotelFromOrganic(r, currency, currencySymbol));
         results.push(...hotelResults);
       }
 
       // Extract from knowledge graph
       if (data.knowledgeGraph) {
-        const kgResult = this._extractHotelFromKG(data.knowledgeGraph);
+        const kgResult = this._extractHotelFromKG(data.knowledgeGraph, currency, currencySymbol);
         if (kgResult) results.push(kgResult);
       }
 
@@ -161,13 +176,18 @@ class GoogleTravelScraper {
   /**
    * Generic travel/event/ticket search
    */
-  async searchGeneral(query, filters = {}, limit = 10) {
+  async searchGeneral(query, filters = {}, limit = 10, geo = null) {
     if (!this.apiKey) {
       throw new Error('SERPER_API_KEY not configured — get free key at https://serper.dev');
     }
 
     try {
-      logger.info(`Google Travel/General: searching "${query}"`);
+      const gl = geo?.gl || 'us';
+      const hl = geo?.hl || 'en';
+      const currency = geo?.currency || 'USD';
+      const currencySymbol = geo?.currencySymbol || '$';
+
+      logger.info(`Google Travel/General: searching "${query}" (gl=${gl}, hl=${hl})`);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -180,8 +200,8 @@ class GoogleTravelScraper {
         },
         body: JSON.stringify({
           q: query,
-          gl: 'us',
-          hl: 'en',
+          gl,
+          hl,
           num: 20,
         }),
         signal: controller.signal,
@@ -208,7 +228,8 @@ class GoogleTravelScraper {
           images: r.imageUrl ? [r.imageUrl] : [],
           url: r.link || '',
           price: this._extractPriceFromText(r.snippet || r.title || ''),
-          currency: 'USD',
+          currency,
+          currencySymbol,
           originalPrice: null,
           discount: null,
           rating: r.rating || null,
@@ -233,7 +254,7 @@ class GoogleTravelScraper {
 
   // ── Normalizers ──────────────────────────────────────────────
 
-  _normalizeFlightFromCard(flight) {
+  _normalizeFlightFromCard(flight, currency = 'USD', currencySymbol = '$') {
     return {
       externalId: this._hashId(JSON.stringify(flight)),
       retailer: flight.source || 'Google Flights',
@@ -250,7 +271,8 @@ class GoogleTravelScraper {
       images: flight.airline_logo ? [flight.airline_logo] : [],
       url: flight.link || `https://www.google.com/travel/flights?q=${encodeURIComponent(flight.departure_airport + ' to ' + flight.arrival_airport)}`,
       price: parsePrice(flight.price) || null,
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: null,
@@ -272,7 +294,7 @@ class GoogleTravelScraper {
     };
   }
 
-  _normalizeFlightFromOrganic(result) {
+  _normalizeFlightFromOrganic(result, currency = 'USD', currencySymbol = '$') {
     return {
       externalId: this._hashId(result.link || result.title),
       retailer: this._extractDomain(result.link),
@@ -283,7 +305,8 @@ class GoogleTravelScraper {
       images: result.imageUrl ? [result.imageUrl] : [],
       url: result.link || '',
       price: this._extractPriceFromText(result.snippet || result.title || ''),
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: result.rating || null,
@@ -295,7 +318,7 @@ class GoogleTravelScraper {
     };
   }
 
-  _normalizeHotelFromOrganic(result) {
+  _normalizeHotelFromOrganic(result, currency = 'USD', currencySymbol = '$') {
     return {
       externalId: this._hashId(result.link || result.title),
       retailer: this._extractDomain(result.link),
@@ -306,7 +329,8 @@ class GoogleTravelScraper {
       images: result.imageUrl ? [result.imageUrl] : [],
       url: result.link || '',
       price: this._extractPriceFromText(result.snippet || result.title || ''),
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: result.rating || null,
@@ -318,7 +342,7 @@ class GoogleTravelScraper {
     };
   }
 
-  _extractFlightFromKG(kg) {
+  _extractFlightFromKG(kg, currency = 'USD', currencySymbol = '$') {
     if (!kg || !kg.title) return null;
     const titleLower = (kg.title || '').toLowerCase();
     if (!titleLower.includes('flight') && !titleLower.includes('airline')) return null;
@@ -333,7 +357,8 @@ class GoogleTravelScraper {
       images: kg.imageUrl ? [kg.imageUrl] : [],
       url: kg.website || '',
       price: null,
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: kg.rating || null,
@@ -345,7 +370,7 @@ class GoogleTravelScraper {
     };
   }
 
-  _extractHotelFromKG(kg) {
+  _extractHotelFromKG(kg, currency = 'USD', currencySymbol = '$') {
     if (!kg || !kg.title) return null;
     const titleLower = (kg.title || '').toLowerCase();
     if (!titleLower.includes('hotel') && !titleLower.includes('resort') && !titleLower.includes('inn')) return null;
@@ -360,7 +385,8 @@ class GoogleTravelScraper {
       images: kg.imageUrl ? [kg.imageUrl] : [],
       url: kg.website || '',
       price: this._extractPriceFromText(kg.description || ''),
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: kg.rating || null,

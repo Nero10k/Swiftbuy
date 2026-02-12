@@ -35,21 +35,31 @@ class GoogleShoppingScraper extends BaseScraper {
 
   /**
    * Search Google Shopping for products across ALL retailers
+   *
+   * @param {string} query - Search query
+   * @param {Object} filters - Price/rating filters
+   * @param {number} limit - Max results
+   * @param {Object} geo - { gl, hl, currency, currencySymbol } for country-aware search
    */
-  async search(query, filters = {}, limit = 10) {
+  async search(query, filters = {}, limit = 10, geo = null) {
     if (!this.apiKey) {
       logger.warn('Google Shopping: SERPER_API_KEY not set. Get free key at https://serper.dev');
       throw new Error('SERPER_API_KEY not configured');
     }
 
     try {
-      logger.info(`Google Shopping API: searching "${query}"`);
+      const gl = geo?.gl || 'us';
+      const hl = geo?.hl || 'en';
+      const currency = geo?.currency || 'USD';
+      const currencySymbol = geo?.currencySymbol || '$';
 
-      // Build the API request
+      logger.info(`Google Shopping API: searching "${query}" (gl=${gl}, hl=${hl}, currency=${currency})`);
+
+      // Build the API request — geo params localize results
       const requestBody = {
         q: this._buildQuery(query, filters),
-        gl: 'us',
-        hl: 'en',
+        gl,
+        hl,
         num: Math.min(limit * 2, 40), // Request extra for post-filtering
       };
 
@@ -78,7 +88,7 @@ class GoogleShoppingScraper extends BaseScraper {
       logger.info(`Google Shopping API: received ${shoppingResults.length} results for "${query}"`);
 
       // Normalize results into our standard product format
-      let products = shoppingResults.map((item) => this._normalizeProduct(item));
+      let products = shoppingResults.map((item) => this._normalizeProduct(item, currency, currencySymbol));
 
       // Filter out products without valid prices
       products = products.filter((p) => p.price && p.price > 0);
@@ -117,7 +127,7 @@ class GoogleShoppingScraper extends BaseScraper {
   /**
    * Normalize a Serper shopping result into our standard product format
    */
-  _normalizeProduct(item) {
+  _normalizeProduct(item, currency = 'USD', currencySymbol = '$') {
     const price = parsePrice(item.price) || null;
     const retailer = this._cleanRetailer(item.source || '');
 
@@ -131,7 +141,8 @@ class GoogleShoppingScraper extends BaseScraper {
       images: item.imageUrl ? [item.imageUrl] : [],
       url: item.link || '',
       price,
-      currency: 'USD',
+      currency,
+      currencySymbol,
       originalPrice: null,
       discount: null,
       rating: item.rating || null,

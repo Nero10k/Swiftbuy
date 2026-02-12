@@ -68,29 +68,30 @@ class ScraperManager {
    * @param {Object} filters - Price/rating filters
    * @param {number} limit - Max results
    * @param {string} intent - Query intent (product, flight, hotel, tickets, food)
+   * @param {Object} geo - { gl, hl, currency, currencySymbol, name } country-aware params
    */
-  async searchAll(query, filters = {}, limit = 10, intent = 'product') {
-    logger.info(`🔍 Universal search for "${query}" | intent: ${intent} | limit: ${limit}`);
+  async searchAll(query, filters = {}, limit = 10, intent = 'product', geo = null) {
+    logger.info(`🔍 Universal search for "${query}" | intent: ${intent} | geo: ${geo?.gl || 'us'} | limit: ${limit}`);
 
     // Route to the correct search provider based on intent
     switch (intent) {
       case 'flight':
-        return this._searchFlights(query, filters, limit);
+        return this._searchFlights(query, filters, limit, geo);
       case 'hotel':
-        return this._searchHotels(query, filters, limit);
+        return this._searchHotels(query, filters, limit, geo);
       case 'tickets':
       case 'food':
       case 'subscription':
-        return this._searchGeneral(query, filters, limit, intent);
+        return this._searchGeneral(query, filters, limit, intent, geo);
       default:
-        return this._searchProducts(query, filters, limit);
+        return this._searchProducts(query, filters, limit, geo);
     }
   }
 
   /**
    * Search for PRODUCTS (Google Shopping → Amazon fallback)
    */
-  async _searchProducts(query, filters, limit) {
+  async _searchProducts(query, filters, limit, geo = null) {
     const results = {
       products: [],
       sources: [],
@@ -100,8 +101,8 @@ class ScraperManager {
     // Phase 1: Google Shopping via Serper.dev API (searches the ENTIRE web)
     if (googleShoppingScraper.isAvailable()) {
       try {
-        logger.info('Phase 1: Searching Google Shopping API (universal — all retailers)...');
-        const googleResults = await googleShoppingScraper.search(query, filters, limit);
+        logger.info(`Phase 1: Searching Google Shopping API (geo: ${geo?.gl || 'us'})...`);
+        const googleResults = await googleShoppingScraper.search(query, filters, limit, geo);
 
         if (googleResults.length > 0) {
           results.products.push(...googleResults);
@@ -149,14 +150,14 @@ class ScraperManager {
   /**
    * Search for FLIGHTS (Google Flights via Serper → Google Search fallback)
    */
-  async _searchFlights(query, filters, limit) {
+  async _searchFlights(query, filters, limit, geo = null) {
     if (!this.travelProvider.isAvailable()) {
       logger.warn('Flight search requires SERPER_API_KEY — get free key at https://serper.dev');
       return [];
     }
 
     try {
-      const results = await this.travelProvider.searchFlights(query, filters, limit);
+      const results = await this.travelProvider.searchFlights(query, filters, limit, geo);
       logger.info(`Flight search: found ${results.length} results`);
       return results;
     } catch (error) {
@@ -167,7 +168,8 @@ class ScraperManager {
         const fallback = await this.travelProvider.searchGeneral(
           `${query} book flights deals`,
           filters,
-          limit
+          limit,
+          geo
         );
         return fallback;
       } catch (e) {
@@ -180,14 +182,14 @@ class ScraperManager {
   /**
    * Search for HOTELS (Google Hotels via Serper)
    */
-  async _searchHotels(query, filters, limit) {
+  async _searchHotels(query, filters, limit, geo = null) {
     if (!this.travelProvider.isAvailable()) {
       logger.warn('Hotel search requires SERPER_API_KEY — get free key at https://serper.dev');
       return [];
     }
 
     try {
-      const results = await this.travelProvider.searchHotels(query, filters, limit);
+      const results = await this.travelProvider.searchHotels(query, filters, limit, geo);
       logger.info(`Hotel search: found ${results.length} results`);
       return results;
     } catch (error) {
@@ -198,7 +200,8 @@ class ScraperManager {
         const fallback = await this.travelProvider.searchGeneral(
           `${query} book hotel deals`,
           filters,
-          limit
+          limit,
+          geo
         );
         return fallback;
       } catch (e) {
@@ -210,13 +213,13 @@ class ScraperManager {
   /**
    * Search for TICKETS, FOOD, or other services
    */
-  async _searchGeneral(query, filters, limit, intent) {
+  async _searchGeneral(query, filters, limit, intent, geo = null) {
     // First try Google Shopping (some tickets are sold there)
     let results = [];
 
     if (googleShoppingScraper.isAvailable()) {
       try {
-        results = await googleShoppingScraper.search(query, filters, limit);
+        results = await googleShoppingScraper.search(query, filters, limit, geo);
       } catch (e) {
         logger.warn(`Shopping search failed for ${intent}: ${e.message}`);
       }
@@ -225,7 +228,7 @@ class ScraperManager {
     // Supplement with general web search
     if (results.length < 3 && this.travelProvider.isAvailable()) {
       try {
-        const generalResults = await this.travelProvider.searchGeneral(query, filters, limit);
+        const generalResults = await this.travelProvider.searchGeneral(query, filters, limit, geo);
         results.push(...generalResults);
       } catch (e) {
         logger.warn(`General search failed for ${intent}: ${e.message}`);

@@ -9,12 +9,44 @@ const generateId = (prefix = '') => {
 };
 
 /**
- * Parse price string to number (e.g., "$129.99" -> 129.99)
+ * Parse price string to number, handling multiple currencies
+ * Examples:
+ *   "$129.99"    → 129.99
+ *   "€49,99"     → 49.99  (European comma decimal)
+ *   "£25.00"     → 25.00
+ *   "1.299,00"   → 1299.00 (European thousands separator)
+ *   "299 lei"    → 299
+ *   "1 499 kr"   → 1499
+ *   "₹2,499"     → 2499
  */
 const parsePrice = (priceStr) => {
   if (typeof priceStr === 'number') return priceStr;
   if (!priceStr) return null;
-  const cleaned = priceStr.replace(/[^0-9.]/g, '');
+
+  // Strip currency symbols, letters, and whitespace
+  let cleaned = priceStr
+    .replace(/[$$€£¥₹₩₺₦₪]/g, '')   // Currency symbols
+    .replace(/[A-Za-z]/g, '')          // Currency codes (RON, lei, kr, CHF, etc.)
+    .trim();
+
+  // Detect European format: "1.299,99" or "49,99" (comma = decimal)
+  // European: comma is LAST separator, dots are thousands
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    // European format: commas are decimal, dots are thousands
+    // "1.299,99" → "1299.99"
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else {
+    // US/UK format: dots are decimal, commas are thousands
+    // "1,299.99" → "1299.99"
+    cleaned = cleaned.replace(/,/g, '');
+  }
+
+  // Remove remaining spaces (e.g., "1 499" → "1499")
+  cleaned = cleaned.replace(/\s/g, '');
+
   const price = parseFloat(cleaned);
   return isNaN(price) ? null : price;
 };
