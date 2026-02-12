@@ -61,67 +61,52 @@ app.get('/skill.md', (req, res) => {
 });
 
 // Debug: test search (temporary — remove after debugging)
-app.get('/debug/search-test', async (req, res) => {
-  const timings = {};
+app.get('/debug/test1', async (req, res) => {
+  // Step 1: Just test if outbound HTTP works at all
   const start = Date.now();
+  try {
+    const resp = await fetch('https://httpbin.org/get', { signal: AbortSignal.timeout(5000) });
+    const data = await resp.json();
+    res.json({ ok: true, ms: Date.now() - start, ip: data.origin });
+  } catch (e) {
+    res.json({ ok: false, ms: Date.now() - start, error: e.message });
+  }
+});
+
+app.get('/debug/test2', async (req, res) => {
+  // Step 2: Test Serper API directly
+  const start = Date.now();
+  const key = process.env.SERPER_API_KEY;
+  if (!key) return res.json({ ok: false, error: 'No SERPER_API_KEY' });
   
   try {
-    // Test 1: Serper API directly
-    const serperKey = process.env.SERPER_API_KEY;
-    timings.serperKeySet = !!serperKey;
-    
-    if (serperKey) {
-      const serperStart = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch('https://google.serper.dev/shopping', {
-          method: 'POST',
-          headers: {
-            'X-API-KEY': serperKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ q: 'wireless headphones', gl: 'us', hl: 'en', num: 5 }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        
-        timings.serperStatus = response.status;
-        timings.serperMs = Date.now() - serperStart;
-        
-        if (response.ok) {
-          const data = await response.json();
-          timings.serperResults = (data.shopping || []).length;
-          timings.serperFirstTitle = data.shopping?.[0]?.title || 'none';
-        } else {
-          timings.serperError = await response.text();
-        }
-      } catch (e) {
-        timings.serperMs = Date.now() - serperStart;
-        timings.serperError = e.message;
-      }
+    const resp = await fetch('https://google.serper.dev/shopping', {
+      method: 'POST',
+      headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: 'headphones', gl: 'us', hl: 'en', num: 3 }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const ms = Date.now() - start;
+    if (!resp.ok) {
+      const errText = await resp.text();
+      return res.json({ ok: false, ms, status: resp.status, error: errText });
     }
-    
-    // Test 2: Full search service
-    const searchStart = Date.now();
-    try {
-      const searchService = require('./services/search/search.service');
-      const results = await searchService.search('headphones', {}, 3);
-      timings.searchMs = Date.now() - searchStart;
-      timings.searchResults = results.products.length;
-      timings.searchSource = results.meta.source;
-    } catch (e) {
-      timings.searchMs = Date.now() - searchStart;
-      timings.searchError = e.message;
-      timings.searchStack = e.stack?.split('\n').slice(0, 3);
-    }
-    
-    timings.totalMs = Date.now() - start;
-    res.json({ success: true, timings });
+    const data = await resp.json();
+    res.json({ ok: true, ms, results: (data.shopping || []).length, first: data.shopping?.[0]?.title });
   } catch (e) {
-    timings.totalMs = Date.now() - start;
-    res.json({ success: false, error: e.message, timings });
+    res.json({ ok: false, ms: Date.now() - start, error: e.message });
+  }
+});
+
+app.get('/debug/test3', async (req, res) => {
+  // Step 3: Test full search pipeline
+  const start = Date.now();
+  try {
+    const searchService = require('./services/search/search.service');
+    const results = await searchService.search('headphones', {}, 3);
+    res.json({ ok: true, ms: Date.now() - start, count: results.products.length, source: results.meta.source });
+  } catch (e) {
+    res.json({ ok: false, ms: Date.now() - start, error: e.message, stack: e.stack?.split('\n').slice(0, 5) });
   }
 });
 
