@@ -60,6 +60,71 @@ app.get('/skill.md', (req, res) => {
   res.send(skillContent);
 });
 
+// Debug: test search (temporary — remove after debugging)
+app.get('/debug/search-test', async (req, res) => {
+  const timings = {};
+  const start = Date.now();
+  
+  try {
+    // Test 1: Serper API directly
+    const serperKey = process.env.SERPER_API_KEY;
+    timings.serperKeySet = !!serperKey;
+    
+    if (serperKey) {
+      const serperStart = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch('https://google.serper.dev/shopping', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': serperKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ q: 'wireless headphones', gl: 'us', hl: 'en', num: 5 }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        
+        timings.serperStatus = response.status;
+        timings.serperMs = Date.now() - serperStart;
+        
+        if (response.ok) {
+          const data = await response.json();
+          timings.serperResults = (data.shopping || []).length;
+          timings.serperFirstTitle = data.shopping?.[0]?.title || 'none';
+        } else {
+          timings.serperError = await response.text();
+        }
+      } catch (e) {
+        timings.serperMs = Date.now() - serperStart;
+        timings.serperError = e.message;
+      }
+    }
+    
+    // Test 2: Full search service
+    const searchStart = Date.now();
+    try {
+      const searchService = require('./services/search/search.service');
+      const results = await searchService.search('headphones', {}, 3);
+      timings.searchMs = Date.now() - searchStart;
+      timings.searchResults = results.products.length;
+      timings.searchSource = results.meta.source;
+    } catch (e) {
+      timings.searchMs = Date.now() - searchStart;
+      timings.searchError = e.message;
+      timings.searchStack = e.stack?.split('\n').slice(0, 3);
+    }
+    
+    timings.totalMs = Date.now() - start;
+    res.json({ success: true, timings });
+  } catch (e) {
+    timings.totalMs = Date.now() - start;
+    res.json({ success: false, error: e.message, timings });
+  }
+});
+
 // API routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/agent', agentRoutes);
