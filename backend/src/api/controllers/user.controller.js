@@ -332,6 +332,44 @@ const updateProfile = async (req, res, next) => {
  * User: Connect wallet
  * POST /api/v1/user/wallet/connect
  */
+/**
+ * User: Quick buy from product view page
+ * POST /api/v1/user/orders/quick-buy
+ */
+const quickBuy = async (req, res, next) => {
+  try {
+    const { product } = req.body;
+
+    if (!product || !product.title || !product.price) {
+      throw new AppError('Product data with title and price is required', 400, 'VALIDATION_ERROR');
+    }
+
+    const order = await purchaseService.initiatePurchase({
+      userId: req.user._id,
+      product,
+      agentId: 'dashboard',
+      agentConversationId: 'quick-buy',
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        order: {
+          orderId: order.orderId,
+          status: order.status,
+          product: order.product,
+          payment: {
+            amount: order.payment.amount,
+            currency: order.payment.currency,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const connectWallet = async (req, res, next) => {
   try {
     const { walletAddress } = req.body;
@@ -602,6 +640,7 @@ module.exports = {
   approveOrder,
   rejectOrder,
   getTransactions,
+  quickBuy,
   updateSettings,
   addAddress,
   updateAddress,

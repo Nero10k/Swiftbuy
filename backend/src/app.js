@@ -62,6 +62,30 @@ app.get('/skill.md', (req, res) => {
   res.send(skillContent);
 });
 
+// Public product view endpoint (no auth — used by product detail page)
+const SearchSession = require('./models/SearchSession');
+app.get('/api/v1/products/session/:sessionId', async (req, res) => {
+  try {
+    const session = await SearchSession.findOne({ sessionId: req.params.sessionId });
+    if (!session) {
+      return res.status(404).json({ success: false, error: { code: 'SESSION_NOT_FOUND', message: 'Search session not found or expired' } });
+    }
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.sessionId,
+        query: session.query,
+        products: session.products,
+        geo: session.geo,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+});
+
 // API routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/agent', agentRoutes);

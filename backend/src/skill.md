@@ -136,19 +136,21 @@ POST /api/v1/agent/search
 
 **🌍 Country-Aware Search:** Results are automatically localized based on the user's shipping address country. A user in Romania gets results from emag.ro, altex.ro, etc. in RON. A user in Netherlands gets results from bol.com, coolblue.nl, etc. in EUR. The response `meta.geo` tells you the currency used. **Always show prices in the local currency** from the response — never assume USD.
 
+**🔗 Product View Links:** Each product in the response includes a `viewUrl` link. **Always include this link** when presenting products so the user can click to see full details, images, and buy directly on Swiftbuy. Format it as a clickable link like `[View on Swiftbuy](viewUrl)`.
+
 **How to present results to the user:**
 
-When you get results, present the **top 2-3 options** clearly. Use the currency from the response (`meta.geo.currencySymbol`):
+When you get results, present the **top 2-3 options** clearly. Use the currency from the response (`meta.geo.currencySymbol`). Include the `viewUrl` for each product:
 
-> Here's what I found for flights from Bucharest to Amsterdam on Feb 14:
+> Here's what I found for wireless headphones:
 >
-> 1. **Wizz Air** — €49, direct, 3h 15m, departs 6:30 AM
-> 2. **KLM** — €129, direct, 3h 10m, departs 11:45 AM  
-> 3. **Ryanair** — €42, 1 stop (Budapest), 5h 40m, departs 8:00 AM
+> 1. **Sony WH-CH720N** — €79.99 from MediaMarkt ⭐ 4.6 — [View on Swiftbuy](viewUrl)
+> 2. **JBL Tune 770NC** — €83.99 from JBL Official ⭐ 4.5 — [View on Swiftbuy](viewUrl)
+> 3. **Sony WH-1000XM5** — €232 from Bol ⭐ 4.7 — [View on Swiftbuy](viewUrl)
 >
-> The Wizz Air flight is the best value — direct and under €50. Want me to book it?
+> The Sony WH-CH720N is the best value — great reviews and under €80. Want me to order it?
 
-Always include: **name/title, price (in local currency), key detail** (for flights: duration/stops, for products: rating/retailer, for hotels: location/stars).
+Always include: **name/title, price (in local currency), key detail** (for flights: duration/stops, for products: rating/retailer, for hotels: location/stars), and the **View on Swiftbuy link**.
 
 ---
 

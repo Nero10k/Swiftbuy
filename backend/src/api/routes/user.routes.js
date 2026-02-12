@@ -20,6 +20,9 @@ router.post('/orders/:orderId/reject', userController.rejectOrder);
 // Transactions
 router.get('/transactions', userController.getTransactions);
 
+// Quick buy (from product view page)
+router.post('/orders/quick-buy', userController.quickBuy);
+
 // Settings
 router.patch('/settings', userController.updateSettings);
 

@@ -3,8 +3,10 @@ const purchaseService = require('../../services/purchase/purchase.service');
 const walletClient = require('../../services/wallet/wallet.client');
 const learningService = require('../../services/intelligence/learning.service');
 const User = require('../../models/User');
+const SearchSession = require('../../models/SearchSession');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { generateId } = require('../../utils/helpers');
 const { getUserCountry, getGeoForCountry } = require('../../utils/geo');
 
 /**
@@ -45,11 +47,59 @@ const searchProducts = async (req, res, next) => {
 
     logger.info(`Agent ${req.agent.id} searched for "${query}" for user ${user_id} (${geo.name})`);
 
+    // Build the frontend base URL for product view links
+    const frontendUrl = process.env.FRONTEND_URL || 'https://swiftbuy-app.vercel.app';
+
+    // Save search session so products can be viewed via link
+    let sessionId = null;
+    if (scoredProducts.length > 0) {
+      sessionId = generateId('srch');
+      try {
+        await SearchSession.create({
+          sessionId,
+          userId: user_id,
+          query,
+          products: scoredProducts.map((p) => ({
+            title: p.title,
+            price: p.price,
+            currency: geo.currency,
+            currencySymbol: geo.currencySymbol,
+            retailer: p.retailer,
+            url: p.url,
+            imageUrl: p.imageUrl || p.image,
+            image: p.image || p.imageUrl,
+            rating: p.rating,
+            reviewCount: p.reviewCount,
+            description: p.description,
+            brand: p.brand,
+            category: p.category,
+            source: p.source,
+            externalId: p.externalId,
+            shippingCost: p.shippingCost,
+          })),
+          geo: {
+            country: userCountry,
+            countryName: geo.name,
+            currency: geo.currency,
+            currencySymbol: geo.currencySymbol,
+          },
+        });
+      } catch (err) {
+        logger.warn(`Failed to save search session: ${err.message}`);
+      }
+    }
+
+    // Add viewUrl to each product
+    const productsWithView = scoredProducts.map((p, i) => ({
+      ...p,
+      viewUrl: sessionId ? `${frontendUrl}/product/${sessionId}/${i}` : undefined,
+    }));
+
     // Build agent-friendly summary with correct currency
     const currSymbol = geo.currencySymbol;
-    const topResults = scoredProducts.slice(0, 3);
+    const topResults = productsWithView.slice(0, 3);
     let agentSummary = '';
-    if (scoredProducts.length === 0) {
+    if (productsWithView.length === 0) {
       agentSummary = `No results found for "${query}". Try rephrasing or broadening the search.`;
     } else {
       const items = topResults.map((p, i) => {
@@ -58,16 +108,17 @@ const searchProducts = async (req, res, next) => {
         if (p.rating) line += ` (${p.rating} stars)`;
         return line;
       });
-      agentSummary = `Found ${scoredProducts.length} results for "${query}" (${geo.name}). Top options: ${items.join(' | ')}`;
+      agentSummary = `Found ${productsWithView.length} results for "${query}" (${geo.name}). Top options: ${items.join(' | ')}`;
     }
 
     res.json({
       success: true,
       data: {
-        products: scoredProducts,
+        products: productsWithView,
         meta: {
           ...results.meta,
           personalizedFor: user_id,
+          sessionId,
           geo: {
             country: userCountry,
             countryName: geo.name,
@@ -77,8 +128,8 @@ const searchProducts = async (req, res, next) => {
         },
         // Agent instructions — tells the agent what to say to the human
         agentMessage: agentSummary,
-        agentInstructions: scoredProducts.length > 0
-          ? `Present the top 2-3 options to the user with prices in ${geo.currency} (${geo.currencySymbol}). Ask which one they'd like, or if they want to refine the search. If they pick one, use the /purchase endpoint with the product data.`
+        agentInstructions: productsWithView.length > 0
+          ? `Present the top 2-3 options to the user with prices in ${geo.currency} (${geo.currencySymbol}). For EACH product, include its viewUrl link so the user can click to see details and buy on Swiftbuy. Ask which one they'd like, or if they want to refine the search. If they pick one, use the /purchase endpoint with the product data.`
           : 'Tell the user no results were found and suggest alternative search terms.',
       },
     });
