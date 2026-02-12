@@ -16,6 +16,36 @@ import {
 
 const STEPS = ['Shipping Address', 'About You', 'Wallet'];
 
+const COUNTRIES = [
+  { code: 'US', name: 'United States', flag: '🇺🇸', phone: '+1', zip: 'ZIP Code', zipPlaceholder: '94105', state: 'State', statePlaceholder: 'CA' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', phone: '+44', zip: 'Postcode', zipPlaceholder: 'SW1A 1AA', state: 'County', statePlaceholder: 'London' },
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱', phone: '+31', zip: 'Postcode', zipPlaceholder: '1012 AB', state: 'Province', statePlaceholder: 'Noord-Holland' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪', phone: '+49', zip: 'PLZ', zipPlaceholder: '10115', state: 'Bundesland', statePlaceholder: 'Berlin' },
+  { code: 'FR', name: 'France', flag: '🇫🇷', phone: '+33', zip: 'Code Postal', zipPlaceholder: '75001', state: 'Région', statePlaceholder: 'Île-de-France' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦', phone: '+1', zip: 'Postal Code', zipPlaceholder: 'M5V 3L9', state: 'Province', statePlaceholder: 'Ontario' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺', phone: '+61', zip: 'Postcode', zipPlaceholder: '2000', state: 'State', statePlaceholder: 'NSW' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸', phone: '+34', zip: 'Código Postal', zipPlaceholder: '28001', state: 'Province', statePlaceholder: 'Madrid' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹', phone: '+39', zip: 'CAP', zipPlaceholder: '00100', state: 'Province', statePlaceholder: 'Roma' },
+  { code: 'PT', name: 'Portugal', flag: '🇵🇹', phone: '+351', zip: 'Código Postal', zipPlaceholder: '1000-001', state: 'District', statePlaceholder: 'Lisboa' },
+  { code: 'BE', name: 'Belgium', flag: '🇧🇪', phone: '+32', zip: 'Postcode', zipPlaceholder: '1000', state: 'Province', statePlaceholder: 'Brussels' },
+  { code: 'AT', name: 'Austria', flag: '🇦🇹', phone: '+43', zip: 'PLZ', zipPlaceholder: '1010', state: 'Bundesland', statePlaceholder: 'Wien' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭', phone: '+41', zip: 'PLZ', zipPlaceholder: '8001', state: 'Canton', statePlaceholder: 'Zürich' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪', phone: '+46', zip: 'Postnummer', zipPlaceholder: '111 22', state: 'County', statePlaceholder: 'Stockholm' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴', phone: '+47', zip: 'Postnummer', zipPlaceholder: '0150', state: 'County', statePlaceholder: 'Oslo' },
+  { code: 'DK', name: 'Denmark', flag: '🇩🇰', phone: '+45', zip: 'Postnummer', zipPlaceholder: '1050', state: 'Region', statePlaceholder: 'Hovedstaden' },
+  { code: 'FI', name: 'Finland', flag: '🇫🇮', phone: '+358', zip: 'Postinumero', zipPlaceholder: '00100', state: 'Region', statePlaceholder: 'Uusimaa' },
+  { code: 'IE', name: 'Ireland', flag: '🇮🇪', phone: '+353', zip: 'Eircode', zipPlaceholder: 'D02 AF30', state: 'County', statePlaceholder: 'Dublin' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵', phone: '+81', zip: 'Postal Code', zipPlaceholder: '100-0001', state: 'Prefecture', statePlaceholder: 'Tokyo' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬', phone: '+65', zip: 'Postal Code', zipPlaceholder: '048619', state: 'District', statePlaceholder: 'Central' },
+  { code: 'AE', name: 'UAE', flag: '🇦🇪', phone: '+971', zip: 'P.O. Box', zipPlaceholder: '00000', state: 'Emirate', statePlaceholder: 'Dubai' },
+  { code: 'RO', name: 'Romania', flag: '🇷🇴', phone: '+40', zip: 'Cod Poștal', zipPlaceholder: '010011', state: 'County', statePlaceholder: 'București' },
+  { code: 'PL', name: 'Poland', flag: '🇵🇱', phone: '+48', zip: 'Kod Pocztowy', zipPlaceholder: '00-001', state: 'Voivodeship', statePlaceholder: 'Mazowieckie' },
+  { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿', phone: '+420', zip: 'PSČ', zipPlaceholder: '110 00', state: 'Region', statePlaceholder: 'Praha' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', phone: '+64', zip: 'Postcode', zipPlaceholder: '6011', state: 'Region', statePlaceholder: 'Wellington' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷', phone: '+82', zip: 'Postal Code', zipPlaceholder: '04524', state: 'Province', statePlaceholder: 'Seoul' },
+  { code: 'IL', name: 'Israel', flag: '🇮🇱', phone: '+972', zip: 'Postal Code', zipPlaceholder: '6100000', state: 'District', statePlaceholder: 'Tel Aviv' },
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, updateUser } = useAppStore();
@@ -30,9 +60,11 @@ export default function OnboardingPage() {
     city: '',
     state: '',
     zipCode: '',
-    country: 'US',
+    country: '',
     phone: '',
   });
+
+  const selectedCountry = COUNTRIES.find((c) => c.code === address.country);
 
   // Profile
   const [profile, setProfile] = useState({
@@ -50,6 +82,10 @@ export default function OnboardingPage() {
 
   const handleNext = () => {
     if (step === 0) {
+      if (!address.country) {
+        setError('Please select your country');
+        return;
+      }
       if (!address.fullName || !address.street || !address.city || !address.state || !address.zipCode) {
         setError('Please fill in all required address fields');
         return;
@@ -165,12 +201,28 @@ export default function OnboardingPage() {
               </div>
 
               <div>
+                <label className="text-sm font-medium text-gray-300">Country *</label>
+                <select
+                  value={address.country}
+                  onChange={(e) => setAddress({ ...address, country: e.target.value, state: '', zipCode: '' })}
+                  className={selectClass}
+                >
+                  <option value="">Select your country</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="text-sm font-medium text-gray-300">Full Name *</label>
                 <input
                   type="text"
                   value={address.fullName}
                   onChange={(e) => setAddress({ ...address, fullName: e.target.value })}
-                  placeholder="John Doe"
+                  placeholder="Your full name"
                   className={inputClass}
                 />
               </div>
@@ -181,7 +233,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={address.street}
                   onChange={(e) => setAddress({ ...address, street: e.target.value })}
-                  placeholder="123 Main St, Apt 4B"
+                  placeholder="Street name, house number, apartment"
                   className={inputClass}
                 />
               </div>
@@ -193,17 +245,19 @@ export default function OnboardingPage() {
                     type="text"
                     value={address.city}
                     onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                    placeholder="San Francisco"
+                    placeholder="Your city"
                     className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-300">State *</label>
+                  <label className="text-sm font-medium text-gray-300">
+                    {selectedCountry?.state || 'State / Province'} *
+                  </label>
                   <input
                     type="text"
                     value={address.state}
                     onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                    placeholder="CA"
+                    placeholder={selectedCountry?.statePlaceholder || 'State or province'}
                     className={inputClass}
                   />
                 </div>
@@ -211,24 +265,31 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-300">ZIP Code *</label>
+                  <label className="text-sm font-medium text-gray-300">
+                    {selectedCountry?.zip || 'Postal Code'} *
+                  </label>
                   <input
                     type="text"
                     value={address.zipCode}
                     onChange={(e) => setAddress({ ...address, zipCode: e.target.value })}
-                    placeholder="94105"
+                    placeholder={selectedCountry?.zipPlaceholder || 'Postal code'}
                     className={inputClass}
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-300">Phone</label>
-                  <input
-                    type="tel"
-                    value={address.phone}
-                    onChange={(e) => setAddress({ ...address, phone: e.target.value })}
-                    placeholder="+1 (555) 123-4567"
-                    className={inputClass}
-                  />
+                  <div className="flex gap-2 mt-1">
+                    <span className="inline-flex items-center px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-400 whitespace-nowrap">
+                      {selectedCountry?.phone || '+?'}
+                    </span>
+                    <input
+                      type="tel"
+                      value={address.phone}
+                      onChange={(e) => setAddress({ ...address, phone: e.target.value })}
+                      placeholder="Phone number"
+                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
