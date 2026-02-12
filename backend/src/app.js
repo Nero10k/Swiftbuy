@@ -36,9 +36,11 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'swiftbuy',
+    version: '1.1.0-geo',
     timestamp: new Date().toISOString(),
     environment: config.env,
-    search: {
+    features: {
+      geoAwareSearch: true,
       serperConfigured: !!process.env.SERPER_API_KEY,
       playwrightEnabled: config.env === 'development',
     },

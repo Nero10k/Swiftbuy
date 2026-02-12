@@ -482,6 +482,10 @@ const getAgentIdentity = async (req, res, next) => {
     if (agentUserId) {
       const user = await User.findById(agentUserId).select('name email profile preferences shippingAddresses walletAddress');
       if (user) {
+        // Detect user's country for geo-aware search
+        const detectedCountry = getUserCountry(user.shippingAddresses);
+        const userGeo = getGeoForCountry(detectedCountry);
+
         userData = {
           userId: user._id.toString(),
           name: user.name,
@@ -493,9 +497,15 @@ const getAgentIdentity = async (req, res, next) => {
             requireApproval: user.preferences?.requireApproval,
             maxAutoApprove: user.preferences?.maxAutoApprove,
           },
+          geo: {
+            country: detectedCountry,
+            countryName: userGeo.name,
+            currency: userGeo.currency,
+            currencySymbol: userGeo.currencySymbol,
+          },
         };
-        agentMessage = `Connected! I'm your Swiftbuy shopping agent. I'm linked to ${user.name}'s account and ready to search, compare, and purchase anything on the web for you.`;
-        agentInstructions = `You are now connected to Swiftbuy. The user_id for all API calls is: ${user._id.toString()}. Start by greeting the user and asking how you can help them shop today. Use this user_id in all subsequent API calls (search, purchase, profile, wallet, etc).`;
+        agentMessage = `Connected! I'm your Swiftbuy shopping agent. I'm linked to ${user.name}'s account (${userGeo.name}) and ready to search, compare, and purchase anything on the web for you. Search results will be localized to ${userGeo.name} in ${userGeo.currency}.`;
+        agentInstructions = `You are now connected to Swiftbuy. The user_id for all API calls is: ${user._id.toString()}. The user is located in ${userGeo.name} — all search results will be localized and prices shown in ${userGeo.currency} (${userGeo.currencySymbol}). Start by greeting the user and asking how you can help them shop today.`;
       }
     }
 
