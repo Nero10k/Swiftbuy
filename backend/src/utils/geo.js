@@ -91,7 +91,10 @@ function getGeoForCountry(countryCode) {
 
 /**
  * Extract the user's country from their shipping addresses
- * Priority: default address → first address → fallback 'US'
+ * Priority: most recently added default address → last address → fallback 'US'
+ *
+ * Uses findLast/reverse to prefer the NEWEST default address,
+ * in case multiple addresses have isDefault: true (e.g. after re-onboarding).
  *
  * @param {Array} shippingAddresses - User's shipping addresses from the User model
  * @returns {string} ISO country code
@@ -99,13 +102,16 @@ function getGeoForCountry(countryCode) {
 function getUserCountry(shippingAddresses) {
   if (!shippingAddresses || shippingAddresses.length === 0) return 'US';
 
-  // Prefer the default address
-  const defaultAddr = shippingAddresses.find((a) => a.isDefault);
+  // Prefer the LAST default address (most recently added)
+  // Reverse iteration ensures we pick the newest one if multiple defaults exist
+  const addresses = [...shippingAddresses];
+  const defaultAddr = addresses.reverse().find((a) => a.isDefault);
   if (defaultAddr && defaultAddr.country) return defaultAddr.country.toUpperCase();
 
-  // Fall back to first address
-  if (shippingAddresses[0] && shippingAddresses[0].country) {
-    return shippingAddresses[0].country.toUpperCase();
+  // Fall back to most recently added address
+  const lastAddr = shippingAddresses[shippingAddresses.length - 1];
+  if (lastAddr && lastAddr.country) {
+    return lastAddr.country.toUpperCase();
   }
 
   return 'US';

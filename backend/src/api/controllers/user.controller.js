@@ -264,6 +264,11 @@ const completeOnboarding = async (req, res, next) => {
 
     // Add shipping address
     if (shippingAddress) {
+      // Clear existing default flags so the new address becomes THE default
+      user.shippingAddresses.forEach((addr) => {
+        addr.isDefault = false;
+      });
+
       user.shippingAddresses.push({
         label: shippingAddress.label || 'Home',
         fullName: shippingAddress.fullName,
