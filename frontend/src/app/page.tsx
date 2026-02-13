@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import HeroChat from '@/components/HeroChat';
+import ArchitectureDiagram from '@/components/ArchitectureDiagram';
 import {
   Zap,
   Search,
@@ -9,11 +10,7 @@ import {
   ArrowRight,
   Bot,
   User,
-  Globe,
-  CreditCard,
   CheckCircle2,
-  ChevronRight,
-  MessageSquare,
   Package,
   TrendingUp,
   Lock,
@@ -249,27 +246,7 @@ export default function LandingPage() {
       {/* ─── Architecture ─── */}
       <section className="py-20">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="bg-white/[0.03] rounded-3xl p-8 md:p-12 border border-white/5">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-8 text-center">
-              Architecture
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-sm">
-              <ArchBlock icon={User} label="User" sublabel="Natural language" />
-              <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
-              <ArchBlock icon={Bot} label="AI Agent" sublabel="OpenClaw / GPT / Claude" />
-              <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
-              <div className="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-2xl p-5 text-center shadow-lg shadow-brand-600/20 min-w-[160px]">
-                <Zap className="h-6 w-6 mx-auto mb-2" />
-                <p className="font-bold">Swiftbuy API</p>
-                <p className="text-brand-200 text-xs mt-1">Search · Purchase · Wallet</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
-              <div className="flex flex-col gap-3">
-                <ArchBlock icon={Globe} label="Providers" sublabel="Retailers · Airlines · Hotels" />
-                <ArchBlock icon={Wallet} label="Karma Wallet" sublabel="USDC → Fiat" />
-              </div>
-            </div>
-          </div>
+          <ArchitectureDiagram />
         </div>
       </section>
 
@@ -706,20 +683,3 @@ function FeatureCard({
   );
 }
 
-function ArchBlock({
-  icon: Icon,
-  label,
-  sublabel,
-}: {
-  icon: any;
-  label: string;
-  sublabel: string;
-}) {
-  return (
-    <div className="bg-white/[0.04] rounded-2xl border border-white/[0.06] p-4 text-center min-w-[140px]">
-      <Icon className="h-5 w-5 mx-auto text-gray-400 mb-1.5" />
-      <p className="font-semibold text-white text-sm">{label}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{sublabel}</p>
-    </div>
-  );
-}
