@@ -33,7 +33,27 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Wallet
+    // Karma Wallet
+    karma: {
+      accountId: { type: String },
+      skLive: { type: String },       // Owner key (encrypted at rest ideally)
+      skAgent: { type: String },      // Agent/spend key
+      cardId: { type: String },
+      cardLast4: { type: String },
+      depositAddress: { type: String },
+      kycStatus: {
+        type: String,
+        enum: ['none', 'pending_verification', 'approved', 'rejected', ''],
+        default: 'none',
+      },
+      kycUrl: { type: String },
+      cardFrozen: { type: Boolean, default: false },
+      perTxnLimit: { type: Number, default: 500 },
+      dailyLimit: { type: Number, default: 1000 },
+      monthlyLimit: { type: Number, default: 5000 },
+    },
+
+    // Legacy wallet address (kept for backwards compat)
     walletAddress: {
       type: String,
       unique: true,

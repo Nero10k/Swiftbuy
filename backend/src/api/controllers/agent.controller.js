@@ -1,6 +1,6 @@
 const searchService = require('../../services/search/search.service');
 const purchaseService = require('../../services/purchase/purchase.service');
-const walletClient = require('../../services/wallet/wallet.client');
+const karmaClient = require('../../services/wallet/wallet.client');
 const learningService = require('../../services/intelligence/learning.service');
 const User = require('../../models/User');
 const SearchSession = require('../../models/SearchSession');
@@ -399,41 +399,62 @@ const getWalletBalance = async (req, res, next) => {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND');
     }
 
-    if (!user.walletAddress) {
+    const status = karmaClient.checkStatus(user);
+
+    if (!status.connected) {
       return res.json({
         success: true,
         data: {
           userId,
           wallet: {
-            address: null,
+            connected: false,
+            ready: false,
             balance: 0,
             currency: 'USDC',
-            balanceUSD: 0,
-            lastUpdated: new Date().toISOString(),
-            connected: false,
           },
           spendingLimits: {
             daily: user.preferences.spendingLimit.daily,
             monthly: user.preferences.spendingLimit.monthly,
             autoApproveBelow: user.preferences.maxAutoApprove,
           },
-          agentMessage: 'You haven\'t connected a wallet yet. Head to your Swiftbuy dashboard to connect your Karma Agent Wallet, then I can make purchases for you.',
-          agentInstructions: 'The user needs to connect their Karma Agent Wallet first. Direct them to the Swiftbuy dashboard.',
+          agentMessage: 'You haven\'t connected a wallet yet. Head to your Swiftbuy dashboard to set up your Karma Agent Card, then I can make purchases for you.',
+          agentInstructions: 'The user needs to set up their Karma wallet first. Direct them to the Swiftbuy dashboard > Wallet page.',
         },
       });
     }
 
+    if (!status.ready) {
+      return res.json({
+        success: true,
+        data: {
+          userId,
+          wallet: {
+            connected: true,
+            ready: false,
+            status: status.status,
+            balance: 0,
+            currency: 'USDC',
+          },
+          spendingLimits: {
+            daily: user.preferences.spendingLimit.daily,
+            monthly: user.preferences.spendingLimit.monthly,
+            autoApproveBelow: user.preferences.maxAutoApprove,
+          },
+          agentMessage: status.status === 'card_frozen'
+            ? 'Your Karma card is frozen. Unfreeze it on your Swiftbuy dashboard to enable purchases.'
+            : 'Your Karma wallet setup is incomplete. Please complete KYC verification on your Swiftbuy dashboard.',
+          agentInstructions: 'The user\'s Karma wallet is not ready. Direct them to the Swiftbuy dashboard > Wallet page to complete setup.',
+        },
+      });
+    }
+
+    // Fetch real balance from Karma
     let balance;
     try {
-      balance = await walletClient.getBalance(user.walletAddress);
+      balance = await karmaClient.getBalance(user.karma.skAgent);
     } catch (error) {
-      logger.warn(`Wallet API unavailable: ${error.message}`);
-      balance = {
-        balance: 0,
-        currency: 'USDC',
-        balanceUSD: 0,
-        lastUpdated: new Date().toISOString(),
-      };
+      logger.warn(`Karma balance unavailable: ${error.message}`);
+      balance = { available: 0, balance: 0, balanceUSD: 0, currency: 'USDC' };
     }
 
     res.json({
@@ -441,19 +462,23 @@ const getWalletBalance = async (req, res, next) => {
       data: {
         userId,
         wallet: {
-          address: user.walletAddress,
-          balance: balance.balance,
-          currency: balance.currency,
-          balanceUSD: balance.balanceUSD,
-          lastUpdated: balance.lastUpdated,
           connected: true,
+          ready: true,
+          depositAddress: user.karma.depositAddress,
+          cardLast4: user.karma.cardLast4,
+          balance: balance.available,
+          currency: 'USDC',
+          balanceUSD: balance.balanceUSD || balance.available,
+          dailyRemaining: balance.dailyRemaining,
+          monthlyRemaining: balance.monthlyRemaining,
+          lastUpdated: new Date().toISOString(),
         },
         spendingLimits: {
           daily: user.preferences.spendingLimit.daily,
           monthly: user.preferences.spendingLimit.monthly,
           autoApproveBelow: user.preferences.maxAutoApprove,
         },
-        agentMessage: `Your wallet balance is $${balance.balanceUSD?.toFixed(2) || '0.00'} USDC. Your daily spending limit is $${user.preferences.spendingLimit.daily} and purchases under $${user.preferences.maxAutoApprove} are auto-approved.`,
+        agentMessage: `Your wallet balance is ${balance.available?.toFixed(2) || '0.00'} USDC (~$${balance.balanceUSD?.toFixed(2) || '0.00'}). Your daily spending limit is $${user.preferences.spendingLimit.daily} and purchases under $${user.preferences.maxAutoApprove} are auto-approved.`,
       },
     });
   } catch (error) {

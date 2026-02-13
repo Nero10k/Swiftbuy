@@ -371,24 +371,14 @@ const quickBuy = async (req, res, next) => {
 };
 
 const connectWallet = async (req, res, next) => {
+  // Legacy endpoint — redirects to the new Karma setup flow
+  // Kept for backwards compatibility
   try {
-    const { walletAddress } = req.body;
-
-    if (!walletAddress) {
-      throw new AppError('walletAddress is required', 400, 'VALIDATION_ERROR');
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { walletAddress },
-      { new: true }
-    );
-
     res.json({
       success: true,
       data: {
-        walletAddress: user.walletAddress,
-        message: 'Wallet connected successfully',
+        message: 'Use POST /wallet/setup to set up your Karma Agent Card.',
+        redirect: '/wallet/setup',
       },
     });
   } catch (error) {

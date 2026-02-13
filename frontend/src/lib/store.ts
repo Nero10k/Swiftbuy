@@ -5,6 +5,18 @@ interface User {
   email: string;
   name: string;
   walletAddress?: string;
+  karma?: {
+    accountId?: string;
+    kycStatus?: string;
+    kycUrl?: string;
+    cardId?: string;
+    cardLast4?: string;
+    depositAddress?: string;
+    cardFrozen?: boolean;
+    perTxnLimit?: number;
+    dailyLimit?: number;
+    monthlyLimit?: number;
+  };
   onboardingComplete?: boolean;
   profile?: {
     phone?: string;

@@ -6,15 +6,23 @@ const { authenticateUser } = require('../middleware/auth');
 // All wallet routes require user authentication
 router.use(authenticateUser);
 
-// Get balance
+// Karma setup & KYC
+router.post('/setup', walletController.setupKarma);
+router.get('/kyc-status', walletController.getKycStatus);
+
+// Wallet status (for dashboard)
+router.get('/status', walletController.getWalletStatus);
+
+// Balance
 router.get('/balance', walletController.getBalance);
 
-// Get transactions
+// Transactions
 router.get('/transactions', walletController.getTransactions);
-
-// Get specific transaction
 router.get('/transactions/:transactionId', walletController.getTransactionStatus);
 
+// Card management
+router.post('/freeze', walletController.freezeCard);
+router.post('/unfreeze', walletController.unfreezeCard);
+router.patch('/limits', walletController.updateLimits);
+
 module.exports = router;
-
-

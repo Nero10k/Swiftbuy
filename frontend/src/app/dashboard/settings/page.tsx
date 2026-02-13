@@ -106,8 +106,7 @@ export default function SettingsPage() {
   const [autoApproveLimit, setAutoApproveLimit] = useState(user?.preferences?.maxAutoApprove || 25);
   const [requireApproval, setRequireApproval] = useState(user?.preferences?.requireApproval ?? true);
 
-  // Wallet state
-  const [walletAddress, setWalletAddress] = useState(user?.walletAddress || '');
+  // Wallet state (legacy — now managed on /wallet page)
 
   // Success messages
   const [successMsg, setSuccessMsg] = useState<Record<string, boolean>>({});
@@ -162,13 +161,7 @@ export default function SettingsPage() {
     },
   });
 
-  const walletMutation = useMutation({
-    mutationFn: (address: string) => userApi.connectWallet(address),
-    onSuccess: () => {
-      updateUser({ walletAddress } as any);
-      showSuccess('wallet');
-    },
-  });
+  // walletMutation removed — wallet is now managed on /dashboard/wallet
 
   const selectedCountry = COUNTRIES.find((c) => c.code === addressForm.country);
   const addresses = user?.shippingAddresses || [];
@@ -719,34 +712,47 @@ export default function SettingsPage() {
             <Wallet className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-white">Wallet</h2>
-            <p className="text-xs text-gray-500">Connect your USDC wallet address</p>
+            <h2 className="text-sm font-semibold text-white">Karma Agent Card</h2>
+            <p className="text-xs text-gray-500">Your USDC-funded virtual card for purchases</p>
           </div>
         </div>
 
-        {successMsg.wallet && (
-          <div className="mb-4 p-2.5 bg-green-500/10 border border-green-500/20 rounded-lg text-xs text-green-400 flex items-center gap-2">
-            <Check className="h-3.5 w-3.5" />
-            Wallet connected successfully
+        {user?.karma?.cardLast4 ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/15 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-5 rounded bg-gradient-to-r from-brand-500 to-brand-700" />
+                <div>
+                  <p className="text-sm font-medium text-white">•••• {user.karma.cardLast4}</p>
+                  <p className="text-[10px] text-gray-500">{user.karma.cardFrozen ? 'Frozen' : 'Active'}</p>
+                </div>
+              </div>
+              <span className="text-xs text-green-400 font-medium">Connected</span>
+            </div>
+            {user.karma.depositAddress && (
+              <p className="text-[10px] text-gray-600 font-mono truncate">
+                Deposit: {user.karma.depositAddress}
+              </p>
+            )}
+            <a
+              href="/dashboard/wallet"
+              className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors"
+            >
+              Manage wallet →
+            </a>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-400 mb-3">No wallet connected yet</p>
+            <a
+              href="/dashboard/wallet"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors"
+            >
+              <Wallet className="h-4 w-4" />
+              Set Up Karma Wallet
+            </a>
           </div>
         )}
-
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={walletAddress}
-            onChange={(e) => setWalletAddress(e.target.value)}
-            placeholder="0x... or wallet address"
-            className={`${inputClass} flex-1 font-mono text-xs`}
-          />
-          <button
-            onClick={() => walletAddress.trim() && walletMutation.mutate(walletAddress.trim())}
-            disabled={walletMutation.isPending}
-            className="px-4 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-500 transition-colors disabled:opacity-40"
-          >
-            {walletMutation.isPending ? 'Connecting...' : user?.walletAddress ? 'Update' : 'Connect'}
-          </button>
-        </div>
       </section>
     </div>
   );

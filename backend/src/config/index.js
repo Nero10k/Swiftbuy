@@ -23,10 +23,9 @@ const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 
-  // Wallet API (USDC + off-ramp)
-  wallet: {
-    apiUrl: process.env.WALLET_API_URL || 'http://localhost:4000',
-    apiKey: process.env.WALLET_API_KEY || '',
+  // Karma Wallet API
+  karma: {
+    baseUrl: process.env.KARMA_BASE_URL || 'https://agents.karmapay.xyz',
   },
 
   // Rate Limiting

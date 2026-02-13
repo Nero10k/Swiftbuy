@@ -2,7 +2,7 @@ const Order = require('../../models/Order');
 const Transaction = require('../../models/Transaction');
 const Product = require('../../models/Product');
 const User = require('../../models/User');
-const walletClient = require('../wallet/wallet.client');
+const karmaClient = require('../wallet/wallet.client');
 const searchService = require('../search/search.service');
 const notificationService = require('../notification/notification.service');
 const logger = require('../../utils/logger');
@@ -73,22 +73,25 @@ class PurchaseService {
     const shippingCost = product.shippingCost || 0;
     const totalAmount = product.price + shippingCost;
 
-    // 5. Check wallet balance (if wallet connected)
-    if (user.walletAddress) {
+    // 5. Check wallet balance via Karma can-spend
+    const karmaStatus = karmaClient.checkStatus(user);
+    if (karmaStatus.ready && user.karma?.skAgent) {
       try {
-        const balance = await walletClient.getBalance(user.walletAddress);
-        if (balance.balance < totalAmount) {
+        const spendCheck = await karmaClient.canSpend(user.karma.skAgent, totalAmount, 'USD');
+        if (!spendCheck.allowed) {
           throw new AppError(
-            `Insufficient balance. Required: $${totalAmount.toFixed(2)}, Available: $${balance.balance.toFixed(2)} USDC`,
+            `Insufficient balance. Required: $${totalAmount.toFixed(2)} (+ $${spendCheck.fees.toFixed(2)} fees), Available: $${spendCheck.available.toFixed(2)} USDC`,
             400,
             'INSUFFICIENT_FUNDS'
           );
         }
+        logger.info(`Karma can-spend approved: $${totalAmount} (total with fees: $${spendCheck.total})`);
       } catch (error) {
-        // If wallet API is unavailable, skip balance check in dev mode
         if (error.code === 'INSUFFICIENT_FUNDS') throw error;
-        logger.warn(`Wallet balance check skipped: ${error.message}`);
+        logger.warn(`Karma can-spend check skipped: ${error.message}`);
       }
+    } else {
+      logger.warn(`Karma wallet not ready for user ${user._id}, skipping balance check (status: ${karmaStatus.status})`);
     }
 
     // 6. Check spending limits
@@ -309,20 +312,52 @@ class PurchaseService {
 
       logger.info(`Processing payment for ${order.orderId}: $${order.payment.amount}`);
 
+      // Check if Karma is ready — use real can-spend, otherwise mock
+      const karmaStatus = karmaClient.checkStatus(user);
       let transferResult;
-      try {
-        transferResult = await walletClient.initiateTransfer(
-          user.walletAddress,
-          order.payment.amount,
-          {
-            orderId: order.orderId,
-            retailer: order.product.retailer,
-            productTitle: order.product.title,
+
+      if (karmaStatus.ready && user.karma?.skAgent) {
+        try {
+          // Verify we can still spend
+          const spendCheck = await karmaClient.canSpend(user.karma.skAgent, order.payment.amount, 'USD');
+          if (!spendCheck.allowed) {
+            throw new AppError(
+              `Insufficient USDC balance. Required: $${spendCheck.total}, Available: $${spendCheck.available}`,
+              400,
+              'INSUFFICIENT_FUNDS'
+            );
           }
-        );
-      } catch (walletError) {
-        // If wallet API is not available, use mock mode for demo
-        logger.warn(`Wallet API unavailable, using mock mode: ${walletError.message}`);
+
+          // The actual charge happens when the card is used at checkout.
+          // Karma's card details are used by the checkout automation.
+          // For now, we record the pre-approval as a successful transfer.
+          transferResult = {
+            transactionId: generateId('tx_karma'),
+            status: 'completed',
+            usdcDebited: spendCheck.total,
+            fiatAmount: order.payment.amount,
+            fee: spendCheck.fees || 0,
+            exchangeRate: 1,
+            method: 'karma_card',
+          };
+
+          logger.info(`Karma payment pre-approved for ${order.orderId}: $${spendCheck.total}`);
+        } catch (karmaError) {
+          if (karmaError.code === 'INSUFFICIENT_FUNDS') throw karmaError;
+          logger.warn(`Karma payment check failed, using mock: ${karmaError.message}`);
+          transferResult = {
+            transactionId: generateId('tx_mock'),
+            status: 'completed',
+            usdcDebited: order.payment.amount,
+            fiatAmount: order.payment.amount,
+            fee: 0,
+            exchangeRate: 1,
+            method: 'mock',
+          };
+        }
+      } else {
+        // Mock mode — Karma not connected
+        logger.warn(`Karma not ready for user ${user._id}, using mock payment`);
         transferResult = {
           transactionId: generateId('tx_mock'),
           status: 'completed',
@@ -330,6 +365,7 @@ class PurchaseService {
           fiatAmount: order.payment.amount,
           fee: 0,
           exchangeRate: 1,
+          method: 'mock',
         };
       }
 
@@ -343,7 +379,7 @@ class PurchaseService {
         fiatAmount: transferResult.fiatAmount || order.payment.amount,
         offRampFee: transferResult.fee || 0,
         exchangeRate: transferResult.exchangeRate || 1,
-        walletAddress: user.walletAddress || 'mock_wallet',
+        walletAddress: user.karma?.depositAddress || user.walletAddress || 'mock_wallet',
         walletTransactionId: transferResult.transactionId,
         status: 'off_ramping',
         offRampStartedAt: new Date(),

@@ -77,11 +77,18 @@ export const agentApi = {
     api.delete(`/user/agents/${agentId}`),
 };
 
-// Wallet
+// Wallet (Karma)
 export const walletApi = {
+  setup: () => api.post('/wallet/setup'),
+  getKycStatus: () => api.get('/wallet/kyc-status'),
+  getStatus: () => api.get('/wallet/status'),
   getBalance: () => api.get('/wallet/balance'),
-  getTransactions: (params?: { page?: number; limit?: number; type?: string }) =>
+  getTransactions: (params?: { limit?: number }) =>
     api.get('/wallet/transactions', { params }),
+  freezeCard: () => api.post('/wallet/freeze'),
+  unfreezeCard: () => api.post('/wallet/unfreeze'),
+  updateLimits: (data: { perTxnLimit?: number; dailyLimit?: number; monthlyLimit?: number }) =>
+    api.patch('/wallet/limits', data),
 };
 
 // Chat

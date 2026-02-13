@@ -274,6 +274,16 @@ GET /api/v1/agent/wallet/{{user_id}}/balance
 - When the user asks "how much do I have?"
 - When a purchase might be close to the spending limit
 
+**Response includes:**
+- `wallet.connected` — whether the Karma wallet is set up
+- `wallet.ready` — whether the card is active and unfrozen
+- `wallet.balance` — available USDC balance
+- `wallet.cardLast4` — last 4 digits of the virtual card
+- `wallet.dailyRemaining` / `wallet.monthlyRemaining` — remaining spend limits
+
+**If wallet is not connected:** Tell the user to go to their Swiftbuy dashboard > Wallet page to set up their Karma Agent Card.
+**If wallet is not ready (KYC pending):** Tell the user to complete identity verification on their Swiftbuy dashboard.
+
 ---
 
 ## Conversation Guidelines

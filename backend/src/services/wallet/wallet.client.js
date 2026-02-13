@@ -5,193 +5,349 @@ const { AppError } = require('../../api/middleware/errorHandler');
 const { retry } = require('../../utils/helpers');
 
 /**
- * Wallet Client
- * Interfaces with the external virtual wallet API (USDC + off-ramp)
+ * Karma Wallet Client
  *
- * The wallet API (built by friend) handles:
- * - USDC balance management
- * - Off-ramping USDC → fiat
- * - Transaction tracking
- * - Refunds
+ * Interfaces with the Karma Agent Card API (https://agents.karmapay.xyz)
+ *
+ * Two key types:
+ *   sk_live_... — Owner key: create cards, set limits, freeze, withdraw
+ *   sk_agent_... — Agent key: check balance, get card details, verify budget
+ *
+ * Flow:
+ *   1. Register (email) → account_id + sk_live
+ *   2. KYC (human verifies identity)
+ *   3. Create card → card_id + sk_agent + deposit_address
+ *   4. Fund with USDC on Solana
+ *   5. Agent spends via card
  */
-class WalletClient {
+class KarmaWalletClient {
   constructor() {
-    this.client = axios.create({
-      baseURL: config.wallet.apiUrl,
+    this.baseUrl = config.karma.baseUrl;
+  }
+
+  /**
+   * Create an axios instance with the appropriate auth key
+   */
+  _client(apiKey) {
+    return axios.create({
+      baseURL: this.baseUrl,
       timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': config.wallet.apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
     });
-
-    // Response interceptor for logging
-    this.client.interceptors.response.use(
-      (response) => {
-        logger.debug('Wallet API response', {
-          url: response.config.url,
-          status: response.status,
-        });
-        return response;
-      },
-      (error) => {
-        logger.error('Wallet API error', {
-          url: error.config?.url,
-          status: error.response?.status,
-          message: error.response?.data?.message || error.message,
-        });
-        throw error;
-      }
-    );
   }
 
+  /* ─────────────────────────────────────────────
+   * OWNER ENDPOINTS (sk_live key)
+   * ───────────────────────────────────────────── */
+
   /**
-   * Get wallet balance (USDC)
-   * @param {string} walletAddress - User's wallet address
-   * @returns {Object} { balance, currency, lastUpdated }
+   * Register a new Karma account
+   * @param {string} email - User's email
+   * @returns {{ accountId: string, skLive: string }}
    */
-  async getBalance(walletAddress) {
+  async register(email) {
     try {
-      const response = await retry(async () => {
-        return this.client.get(`/wallet/${walletAddress}/balance`);
+      const response = await axios.post(`${this.baseUrl}/api/register`, {
+        email,
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 15000,
       });
 
       return {
+        accountId: response.data.account_id,
+        skLive: response.data.secret_key,
+      };
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma register failed: ${msg}`);
+      throw new AppError(`Failed to create Karma account: ${msg}`, 502, 'KARMA_REGISTER_ERROR');
+    }
+  }
+
+  /**
+   * Start KYC process
+   * @param {string} skLive - Owner key
+   * @returns {{ status: string, kycUrl: string }}
+   */
+  async startKyc(skLive) {
+    try {
+      const response = await this._client(skLive).post('/api/kyc');
+
+      return {
+        status: response.data.status,
+        kycUrl: response.data.kyc_url,
+      };
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma KYC start failed: ${msg}`);
+      throw new AppError(`Failed to start KYC: ${msg}`, 502, 'KARMA_KYC_ERROR');
+    }
+  }
+
+  /**
+   * Check KYC status
+   * @param {string} skLive - Owner key
+   * @returns {{ status: string }}
+   */
+  async getKycStatus(skLive) {
+    try {
+      const response = await this._client(skLive).get('/api/kyc/status');
+      return { status: response.data.status };
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma KYC status failed: ${msg}`);
+      throw new AppError(`Failed to check KYC status: ${msg}`, 502, 'KARMA_KYC_STATUS_ERROR');
+    }
+  }
+
+  /**
+   * Create a virtual card
+   * @param {string} skLive - Owner key
+   * @param {Object} options
+   * @param {string} options.name - Card name
+   * @param {number} [options.perTxnLimit] - Per-transaction limit
+   * @param {number} [options.dailyLimit] - Daily limit
+   * @param {number} [options.monthlyLimit] - Monthly limit
+   * @returns {{ cardId: string, skAgent: string, depositAddress: string, last4: string }}
+   */
+  async createCard(skLive, { name = 'Swiftbuy Agent', perTxnLimit = 500, dailyLimit, monthlyLimit } = {}) {
+    try {
+      const body = { name, per_txn_limit: perTxnLimit };
+      if (dailyLimit) body.daily_limit = dailyLimit;
+      if (monthlyLimit) body.monthly_limit = monthlyLimit;
+
+      const response = await this._client(skLive).post('/api/cards', body);
+
+      return {
+        cardId: response.data.card_id,
+        skAgent: response.data.agent_api_key,
+        depositAddress: response.data.deposit_address,
+        last4: response.data.last4,
+      };
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma create card failed: ${msg}`);
+      throw new AppError(`Failed to create card: ${msg}`, 502, 'KARMA_CARD_ERROR');
+    }
+  }
+
+  /**
+   * List cards
+   * @param {string} skLive - Owner key
+   * @returns {Array}
+   */
+  async listCards(skLive) {
+    try {
+      const response = await this._client(skLive).get('/api/cards');
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma list cards failed: ${msg}`);
+      throw new AppError(`Failed to list cards: ${msg}`, 502, 'KARMA_LIST_CARDS_ERROR');
+    }
+  }
+
+  /**
+   * Update card limits
+   * @param {string} skLive - Owner key
+   * @param {string} cardId
+   * @param {Object} updates - { name, per_txn_limit, daily_limit, monthly_limit }
+   */
+  async updateCardLimits(skLive, cardId, updates) {
+    try {
+      const response = await this._client(skLive).patch(`/api/cards/${cardId}`, updates);
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma update card failed: ${msg}`);
+      throw new AppError(`Failed to update card: ${msg}`, 502, 'KARMA_UPDATE_CARD_ERROR');
+    }
+  }
+
+  /**
+   * Freeze a card
+   * @param {string} skLive - Owner key
+   * @param {string} cardId
+   */
+  async freezeCard(skLive, cardId) {
+    try {
+      const response = await this._client(skLive).post(`/api/cards/${cardId}/freeze`);
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma freeze card failed: ${msg}`);
+      throw new AppError(`Failed to freeze card: ${msg}`, 502, 'KARMA_FREEZE_ERROR');
+    }
+  }
+
+  /**
+   * Unfreeze a card
+   * @param {string} skLive - Owner key
+   * @param {string} cardId
+   */
+  async unfreezeCard(skLive, cardId) {
+    try {
+      const response = await this._client(skLive).post(`/api/cards/${cardId}/unfreeze`);
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma unfreeze card failed: ${msg}`);
+      throw new AppError(`Failed to unfreeze card: ${msg}`, 502, 'KARMA_UNFREEZE_ERROR');
+    }
+  }
+
+  /**
+   * Withdraw USDC
+   * @param {string} skLive - Owner key
+   * @param {string} cardId
+   * @param {string} address - Solana wallet address
+   * @param {number} amount - USDC amount
+   */
+  async withdraw(skLive, cardId, address, amount) {
+    try {
+      const response = await this._client(skLive).post(`/api/cards/${cardId}/withdraw`, {
+        address,
+        amount,
+      });
+      return response.data;
+    } catch (error) {
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma withdraw failed: ${msg}`);
+      throw new AppError(`Failed to withdraw: ${msg}`, 502, 'KARMA_WITHDRAW_ERROR');
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+   * AGENT/SPEND ENDPOINTS (sk_agent key)
+   * ───────────────────────────────────────────── */
+
+  /**
+   * Get balance
+   * @param {string} skAgent - Agent key
+   * @returns {{ available: number, balance: number, depositAddress: string, dailyRemaining: number, monthlyRemaining: number }}
+   */
+  async getBalance(skAgent) {
+    try {
+      const response = await retry(async () => {
+        return this._client(skAgent).get('/api/spend/balance');
+      });
+
+      return {
+        available: response.data.available,
         balance: response.data.balance,
+        depositAddress: response.data.deposit_address,
+        dailyRemaining: response.data.daily_remaining,
+        monthlyRemaining: response.data.monthly_remaining,
         currency: 'USDC',
-        balanceUSD: response.data.balance, // USDC is pegged 1:1 to USD
-        lastUpdated: response.data.lastUpdated || new Date().toISOString(),
+        balanceUSD: response.data.available, // USDC is pegged 1:1
       };
     } catch (error) {
-      throw new AppError(
-        `Failed to fetch wallet balance: ${error.message}`,
-        502,
-        'WALLET_BALANCE_ERROR'
-      );
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma get balance failed: ${msg}`);
+      throw new AppError(`Failed to fetch balance: ${msg}`, 502, 'KARMA_BALANCE_ERROR');
     }
   }
 
   /**
-   * Initiate a purchase transfer with off-ramp
-   * Converts USDC to fiat and holds it for purchase execution
-   *
-   * @param {string} walletAddress - User's wallet address
-   * @param {number} usdAmount - Amount in USD to spend
-   * @param {Object} metadata - Order metadata
-   * @returns {Object} { transactionId, status, usdcDebited, fiatAmount, fee }
+   * Check if agent can afford a purchase
+   * @param {string} skAgent - Agent key
+   * @param {number} amount
+   * @param {string} [currency='USD']
+   * @returns {{ allowed: boolean, fees: number, total: number, available: number }}
    */
-  async initiateTransfer(walletAddress, usdAmount, metadata = {}) {
+  async canSpend(skAgent, amount, currency = 'USD') {
     try {
-      const response = await this.client.post(`/wallet/${walletAddress}/transfer`, {
-        amount: usdAmount,
-        currency: 'USD',
-        type: 'purchase',
-        description: metadata.description || 'Swiftbuy purchase',
-        metadata: {
-          platform: 'swiftbuy',
-          orderId: metadata.orderId,
-          retailer: metadata.retailer,
-          productTitle: metadata.productTitle,
-        },
+      const response = await this._client(skAgent).post('/api/spend/can-spend', {
+        amount,
+        currency,
       });
 
       return {
-        transactionId: response.data.transactionId,
-        status: response.data.status,
-        usdcDebited: response.data.usdcAmount,
-        fiatAmount: response.data.fiatAmount,
-        fee: response.data.fee || 0,
-        exchangeRate: response.data.exchangeRate || 1,
+        allowed: response.data.allowed,
+        fees: response.data.fees || 0,
+        total: response.data.total,
+        available: response.data.available,
       };
     } catch (error) {
-      if (error.response?.status === 400 && error.response?.data?.code === 'INSUFFICIENT_FUNDS') {
-        throw new AppError(
-          'Insufficient USDC balance for this purchase',
-          400,
-          'INSUFFICIENT_FUNDS'
-        );
-      }
-      throw new AppError(
-        `Failed to initiate wallet transfer: ${error.message}`,
-        502,
-        'WALLET_TRANSFER_ERROR'
-      );
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma can-spend check failed: ${msg}`);
+      throw new AppError(`Failed to check spending: ${msg}`, 502, 'KARMA_CAN_SPEND_ERROR');
     }
   }
 
   /**
-   * Get transaction status from wallet
-   * @param {string} transactionId - Wallet transaction ID
-   * @returns {Object} { status, details }
+   * Get card details for checkout
+   * @param {string} skAgent - Agent key
+   * @returns {{ number: string, cvv: string, expiry: string, expiryMonth: string, expiryYear: string }}
    */
-  async getTransactionStatus(transactionId) {
+  async getCardDetails(skAgent) {
     try {
-      const response = await retry(async () => {
-        return this.client.get(`/wallet/transactions/${transactionId}`);
-      });
+      const response = await this._client(skAgent).get('/api/spend/card');
 
       return {
-        transactionId: response.data.transactionId,
-        status: response.data.status,
-        usdcAmount: response.data.usdcAmount,
-        fiatAmount: response.data.fiatAmount,
-        fee: response.data.fee,
-        createdAt: response.data.createdAt,
-        completedAt: response.data.completedAt,
+        number: response.data.number,
+        cvv: response.data.cvv,
+        expiry: response.data.expiry,
+        expiryMonth: response.data.expiry_month,
+        expiryYear: response.data.expiry_year,
       };
     } catch (error) {
-      throw new AppError(
-        `Failed to get transaction status: ${error.message}`,
-        502,
-        'WALLET_TX_STATUS_ERROR'
-      );
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma get card details failed: ${msg}`);
+      throw new AppError(`Failed to get card details: ${msg}`, 502, 'KARMA_CARD_DETAILS_ERROR');
     }
   }
 
   /**
-   * Request a refund for a transaction
-   * @param {string} transactionId - Wallet transaction ID
-   * @param {string} reason - Refund reason
-   * @returns {Object} { refundId, status }
+   * Get transaction history
+   * @param {string} skAgent - Agent key
+   * @param {number} [limit=20]
+   * @returns {Array}
    */
-  async refundTransaction(transactionId, reason = 'Purchase cancelled') {
+  async getTransactions(skAgent, limit = 20) {
     try {
-      const response = await this.client.post(`/wallet/transactions/${transactionId}/refund`, {
-        reason,
-        platform: 'swiftbuy',
-      });
-
-      return {
-        refundId: response.data.refundId,
-        status: response.data.status,
-        refundedAmount: response.data.refundedAmount,
-        currency: response.data.currency || 'USDC',
-      };
+      const response = await this._client(skAgent).get(`/api/spend/transactions?limit=${limit}`);
+      return response.data;
     } catch (error) {
-      throw new AppError(
-        `Failed to process refund: ${error.message}`,
-        502,
-        'WALLET_REFUND_ERROR'
-      );
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error(`Karma get transactions failed: ${msg}`);
+      throw new AppError(`Failed to get transactions: ${msg}`, 502, 'KARMA_TX_ERROR');
     }
   }
 
+  /* ─────────────────────────────────────────────
+   * HELPER: Check if user has Karma connected
+   * ───────────────────────────────────────────── */
+
   /**
-   * Validate that a wallet address exists and is active
-   * @param {string} walletAddress
-   * @returns {boolean}
+   * Check if a user's Karma setup is complete and ready to spend
+   * @param {Object} user - User document
+   * @returns {{ connected: boolean, ready: boolean, status: string }}
    */
-  async validateWallet(walletAddress) {
-    try {
-      const balance = await this.getBalance(walletAddress);
-      return balance !== null;
-    } catch {
-      return false;
+  checkStatus(user) {
+    if (!user.karma || !user.karma.accountId) {
+      return { connected: false, ready: false, status: 'not_connected' };
     }
+
+    if (user.karma.kycStatus !== 'approved') {
+      return { connected: true, ready: false, status: `kyc_${user.karma.kycStatus}` };
+    }
+
+    if (!user.karma.cardId) {
+      return { connected: true, ready: false, status: 'no_card' };
+    }
+
+    if (user.karma.cardFrozen) {
+      return { connected: true, ready: false, status: 'card_frozen' };
+    }
+
+    return { connected: true, ready: true, status: 'ready' };
   }
 }
 
 // Singleton
-module.exports = new WalletClient();
-
-
+module.exports = new KarmaWalletClient();
