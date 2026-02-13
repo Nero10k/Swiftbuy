@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import HeroChat from '@/components/HeroChat';
 import {
   Zap,
   Search,
@@ -194,59 +195,9 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Hero Visual — Conversation Mock */}
+          {/* Hero Visual — Animated Chat Demo */}
           <div className="mt-16 max-w-3xl mx-auto">
-            <div className="bg-black/60 rounded-3xl shadow-2xl shadow-black/30 overflow-hidden border border-white/10">
-              {/* Terminal header */}
-              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-white/5">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                  <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                </div>
-                <span className="text-gray-500 text-xs font-mono ml-2">swiftbuy — agent session</span>
-              </div>
-              {/* Conversation */}
-              <div className="p-6 space-y-5 font-mono text-sm">
-                <div className="flex gap-3">
-                  <span className="text-purple-400 shrink-0">You:</span>
-                  <span className="text-gray-300">Book me a flight to Barcelona next Friday, return Monday</span>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-green-400 shrink-0">Agent:</span>
-                  <span className="text-gray-500">Searching flights SFO → BCN, Feb 14–17...</span>
-                </div>
-                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                  <div className="text-gray-600 text-xs mb-3">SWIFTBUY RESULTS — FLIGHTS</div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-gray-300">
-                      <span>1. Delta — 1 stop, 12h 40m</span>
-                      <span className="text-green-400">$487.00</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>2. United — nonstop, 10h 55m</span>
-                      <span className="text-green-400">$512.00</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>3. Iberia — nonstop, 11h 10m</span>
-                      <span className="text-yellow-400">$539.00</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-purple-400 shrink-0">You:</span>
-                  <span className="text-gray-300">Book the United nonstop. Also find me a hotel near La Rambla</span>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-green-400 shrink-0">Agent:</span>
-                  <span className="text-gray-500">
-                    ✅ Flight booked! $512.00 via Karma Wallet → off-ramped → confirmed on United.
-                    <br />
-                    <span className="text-gray-600">Conf: UA-7291840 · Searching hotels now...</span>
-                  </span>
-                </div>
-              </div>
-            </div>
+            <HeroChat />
           </div>
         </div>
       </section>
