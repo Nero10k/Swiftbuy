@@ -7,6 +7,9 @@ const logger = require('../../utils/logger');
 /**
  * Setup Karma Wallet — register new account + start KYC
  * POST /api/v1/wallet/setup
+ *
+ * Body: { firstName, lastName, birthDate, nationalId, countryOfIssue }
+ * Address is auto-populated from user's default shipping address.
  */
 const setupKarma = async (req, res, next) => {
   try {
@@ -26,12 +29,46 @@ const setupKarma = async (req, res, next) => {
       });
     }
 
+    // Validate KYC fields
+    const { firstName, lastName, birthDate, nationalId, countryOfIssue } = req.body;
+
+    if (!firstName || !lastName || !birthDate || !nationalId || !countryOfIssue) {
+      throw new AppError(
+        'KYC info required: firstName, lastName, birthDate, nationalId, countryOfIssue',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    // Get default shipping address for KYC address fields
+    const defaultAddr = user.shippingAddresses?.find((a) => a.isDefault) || user.shippingAddresses?.[0];
+    if (!defaultAddr) {
+      throw new AppError(
+        'A shipping address is required. Please add one in Settings first.',
+        400,
+        'NO_ADDRESS'
+      );
+    }
+
     // 1. Register with Karma
     logger.info(`Setting up Karma wallet for user ${user._id} (${user.email})`);
     const { accountId, skLive } = await karmaClient.register(user.email);
 
-    // 2. Start KYC
-    const { status: kycStatus, kycUrl } = await karmaClient.startKyc(skLive);
+    // 2. Start KYC with personal info
+    const { status: kycStatus, kycUrl } = await karmaClient.startKyc(skLive, {
+      firstName,
+      lastName,
+      birthDate,
+      nationalId,
+      countryOfIssue,
+      address: {
+        line1: defaultAddr.street,
+        city: defaultAddr.city,
+        region: defaultAddr.state,
+        postalCode: defaultAddr.zipCode,
+        countryCode: defaultAddr.country,
+      },
+    });
 
     // 3. Save to user
     user.karma = {
@@ -50,7 +87,7 @@ const setupKarma = async (req, res, next) => {
         accountId,
         kycStatus: user.karma.kycStatus,
         kycUrl,
-        message: 'Karma account created. Complete KYC to enable spending.',
+        message: 'Karma account created. Complete KYC verification to enable spending.',
       },
     });
   } catch (error) {

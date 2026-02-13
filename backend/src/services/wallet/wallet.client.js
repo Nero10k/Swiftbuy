@@ -71,11 +71,36 @@ class KarmaWalletClient {
   /**
    * Start KYC process
    * @param {string} skLive - Owner key
+   * @param {Object} personalInfo - Required personal information
+   * @param {string} personalInfo.firstName
+   * @param {string} personalInfo.lastName
+   * @param {string} personalInfo.birthDate - YYYY-MM-DD
+   * @param {string} personalInfo.nationalId - Government ID number
+   * @param {string} personalInfo.countryOfIssue - ISO 2-letter country code
+   * @param {Object} personalInfo.address
+   * @param {string} personalInfo.address.line1
+   * @param {string} personalInfo.address.city
+   * @param {string} personalInfo.address.region
+   * @param {string} personalInfo.address.postalCode
+   * @param {string} personalInfo.address.countryCode - ISO 2-letter
    * @returns {{ status: string, kycUrl: string }}
    */
-  async startKyc(skLive) {
+  async startKyc(skLive, personalInfo) {
     try {
-      const response = await this._client(skLive).post('/api/kyc');
+      const response = await this._client(skLive).post('/api/kyc', {
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        birthDate: personalInfo.birthDate,
+        nationalId: personalInfo.nationalId,
+        countryOfIssue: personalInfo.countryOfIssue,
+        address: {
+          line1: personalInfo.address.line1,
+          city: personalInfo.address.city,
+          region: personalInfo.address.region,
+          postalCode: personalInfo.address.postalCode,
+          countryCode: personalInfo.address.countryCode,
+        },
+      });
 
       return {
         status: response.data.status,
