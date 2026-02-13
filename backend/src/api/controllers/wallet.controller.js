@@ -16,7 +16,7 @@ const setupKarma = async (req, res, next) => {
     const user = await User.findById(req.user._id);
 
     // If already registered but KYC not started, retry KYC
-    if (user.karma?.accountId && user.karma?.skLive && !user.karma?.kycUrl) {
+    if (user.karma?.skLive && !user.karma?.kycUrl) {
       logger.info(`Retrying KYC for user ${user._id} (already registered)`);
       try {
         const { status: kycStatus, kycUrl } = await karmaClient.startKyc(user.karma.skLive);
@@ -40,7 +40,7 @@ const setupKarma = async (req, res, next) => {
     }
 
     // If already fully set up, return status
-    if (user.karma?.accountId && user.karma?.kycUrl) {
+    if (user.karma?.skLive && user.karma?.kycUrl) {
       const status = karmaClient.checkStatus(user);
       return res.json({
         success: true,
@@ -117,8 +117,8 @@ const connectExisting = async (req, res, next) => {
 
     const user = await User.findById(req.user._id);
 
-    // If already connected, tell them
-    if (user.karma?.accountId && user.karma?.skLive === skLive) {
+    // If already connected with this key, tell them
+    if (user.karma?.skLive === skLive) {
       const status = karmaClient.checkStatus(user);
       return res.json({
         success: true,
@@ -181,6 +181,17 @@ const connectExisting = async (req, res, next) => {
       } catch (cardError) {
         logger.warn(`Could not import/create card: ${cardError.message}`);
       }
+    } else {
+      // KYC not yet approved — try to get/start KYC so user gets a verification link
+      try {
+        const kycResult = await karmaClient.startKyc(skLive);
+        user.karma.kycStatus = kycResult.status || 'pending_verification';
+        user.karma.kycUrl = kycResult.kycUrl;
+        logger.info(`KYC started for existing Karma user ${user._id}: ${kycResult.status}`);
+      } catch (kycError) {
+        logger.warn(`Could not start KYC for existing user: ${kycError.message}`);
+        // Not fatal — user can retry from the KYC pending screen
+      }
     }
 
     await user.save();
@@ -192,6 +203,7 @@ const connectExisting = async (req, res, next) => {
       data: {
         ...status,
         kycStatus: user.karma.kycStatus,
+        kycUrl: user.karma.kycUrl || null,
         cardLast4: user.karma.cardLast4 || null,
         depositAddress: user.karma.depositAddress || null,
         message: status.ready
@@ -214,7 +226,7 @@ const getKycStatus = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
-    if (!user.karma?.accountId) {
+    if (!user.karma?.skLive) {
       throw new AppError('Karma wallet not set up. Call POST /wallet/setup first.', 400, 'NO_KARMA_ACCOUNT');
     }
 

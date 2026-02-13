@@ -329,7 +329,7 @@ class KarmaWalletClient {
    * @returns {{ connected: boolean, ready: boolean, status: string }}
    */
   checkStatus(user) {
-    if (!user.karma || !user.karma.accountId) {
+    if (!user.karma || !user.karma.skLive) {
       return { connected: false, ready: false, status: 'not_connected' };
     }
 
