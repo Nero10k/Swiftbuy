@@ -43,7 +43,6 @@ const userSchema = new mongoose.Schema(
       depositAddress: { type: String },
       kycStatus: {
         type: String,
-        enum: ['none', 'pending_verification', 'approved', 'rejected', ''],
         default: 'none',
       },
       kycUrl: { type: String },
