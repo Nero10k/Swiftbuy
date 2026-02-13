@@ -136,42 +136,45 @@ export default function LandingPage() {
         <div className="absolute bottom-20 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-3xl" />
 
         <div className="relative max-w-7xl mx-auto px-6 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Hero headline — full width */}
+          <div className="text-center max-w-4xl mx-auto mb-16">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight">
+              Your AI agent can now{' '}
+              <span className="gradient-text from-brand-400 to-purple-400">
+                buy anything
+              </span>{' '}
+              on the web
+            </h1>
+            <p className="mt-6 text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              Swiftbuy lets any AI agent search, compare, and purchase — products, flights, hotels — powered by{' '}
+              <a
+                href="https://agents.karmapay.xyz/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white font-medium underline decoration-brand-400/50 underline-offset-2 hover:decoration-brand-400 transition-colors"
+              >
+                Karma Agent Wallet
+              </a>
+              .
+            </p>
+          </div>
+
+          {/* Side-by-side: Chat demo + How it works */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start">
             {/* Left — Animated Chat Demo */}
             <div className="order-2 lg:order-1">
               <HeroChat />
             </div>
 
-            {/* Right — Headline + How It Works + CTAs */}
-            <div className="order-1 lg:order-2">
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] tracking-tight">
-                Your AI agent can now{' '}
-                <span className="gradient-text from-brand-400 to-purple-400">
-                  buy anything
-                </span>{' '}
-                on the web
-              </h1>
-
-              <p className="mt-5 text-lg text-gray-400 leading-relaxed">
-                Swiftbuy lets any AI agent search, compare, and purchase — products, flights, hotels — powered by{' '}
-                <a
-                  href="https://agents.karmapay.xyz/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white font-medium underline decoration-brand-400/50 underline-offset-2 hover:decoration-brand-400 transition-colors"
-                >
-                  Karma Agent Wallet
-                </a>
-                .
-              </p>
-
+            {/* Right — How It Works + CTAs */}
+            <div className="order-1 lg:order-2 lg:pt-2">
               {/* How It Works — Compact Steps */}
-              <div className="mt-10 space-y-5">
+              <div className="space-y-5">
                 <p className="text-xs font-semibold text-brand-400 uppercase tracking-widest">
                   How it works
                 </p>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <HeroStep
                     number="1"
                     title="You talk"
