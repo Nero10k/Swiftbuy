@@ -101,9 +101,6 @@ export default function LandingPage() {
             <span className="text-xl font-bold text-white">Swiftbuy</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-gray-400">
-            <a href="#how-it-works" className="hover:text-white transition-colors">
-              How It Works
-            </a>
             <a href="#use-cases" className="hover:text-white transition-colors">
               Use Cases
             </a>
@@ -131,73 +128,101 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ─── Hero ─── */}
-      <section className="relative pt-32 pb-20 overflow-hidden">
+      {/* ─── Hero — Side by Side ─── */}
+      <section className="relative pt-28 pb-24 overflow-hidden min-h-[100vh] flex items-center">
         {/* Background effects */}
         <div className="absolute inset-0 bg-gradient-to-b from-brand-950/50 to-gray-950" />
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-brand-500/5 rounded-full blur-3xl" />
-        <div className="absolute top-40 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-20 left-1/4 w-[600px] h-[600px] bg-brand-500/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-3xl" />
 
-        <div className="relative max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-4xl mx-auto">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-brand-400 text-sm font-medium mb-8">
-              <span className="flex h-2 w-2 rounded-full bg-brand-500 animate-pulse-soft" />
-              The commerce execution layer for AI agents
+        <div className="relative max-w-7xl mx-auto px-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left — Animated Chat Demo */}
+            <div className="order-2 lg:order-1">
+              <HeroChat />
             </div>
 
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight">
-              Your Openclaw agent can now{' '}
-              <span className="gradient-text from-brand-400 to-purple-400">
-                buy anything
-              </span>{' '}
-              on the web
-            </h1>
+            {/* Right — Headline + How It Works + CTAs */}
+            <div className="order-1 lg:order-2">
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] tracking-tight">
+                Your AI agent can now{' '}
+                <span className="gradient-text from-brand-400 to-purple-400">
+                  buy anything
+                </span>{' '}
+                on the web
+              </h1>
 
-            <p className="mt-6 text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Swiftbuy is the middleware that lets any AI agent search, compare, and
-              purchase anything — products, flights, hotels, food, tickets — powered by{' '}
-              <a
-                href="https://agents.karmapay.xyz/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white font-medium underline decoration-brand-400/50 underline-offset-2 hover:decoration-brand-400 transition-colors"
-              >
-                Karma Agent Wallet
-              </a>{' '}
-              with automatic off-ramping.
-            </p>
+              <p className="mt-5 text-lg text-gray-400 leading-relaxed">
+                Swiftbuy lets any AI agent search, compare, and purchase — products, flights, hotels — powered by{' '}
+                <a
+                  href="https://agents.karmapay.xyz/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white font-medium underline decoration-brand-400/50 underline-offset-2 hover:decoration-brand-400 transition-colors"
+                >
+                  Karma Agent Wallet
+                </a>
+                .
+              </p>
 
-            {/* CTAs */}
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/dashboard"
-                className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-2xl shadow-xl shadow-brand-600/25 hover:shadow-2xl hover:shadow-brand-600/30 transition-all text-lg"
-              >
-                <User className="h-5 w-5" />
-                Open Dashboard
-                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <a
-                href="#developers"
-                className="group flex items-center gap-3 px-8 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-2xl hover:bg-white/10 transition-all text-lg"
-              >
-                <Bot className="h-5 w-5" />
-                Connect Your Agent
-                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </a>
+              {/* How It Works — Compact Steps */}
+              <div className="mt-10 space-y-5">
+                <p className="text-xs font-semibold text-brand-400 uppercase tracking-widest">
+                  How it works
+                </p>
+
+                <div className="space-y-4">
+                  <HeroStep
+                    number="1"
+                    title="You talk"
+                    description="Tell your AI agent what you need in natural language."
+                  />
+                  <HeroStep
+                    number="2"
+                    title="Agent searches"
+                    description="Swiftbuy searches retailers, airlines, and hotels in real-time."
+                  />
+                  <HeroStep
+                    number="3"
+                    title="Karma pays"
+                    description="USDC auto-converts to fiat. Spending limits enforced."
+                  />
+                  <HeroStep
+                    number="4"
+                    title="Confirmed"
+                    description="Order placed, tracking sent. All in one conversation."
+                  />
+                </div>
+              </div>
+
+              {/* CTAs */}
+              <div className="mt-10 flex flex-col sm:flex-row gap-3">
+                <Link
+                  href="/dashboard"
+                  className="group flex items-center justify-center gap-2.5 px-7 py-3.5 bg-gradient-to-r from-brand-600 to-brand-700 text-white font-semibold rounded-xl shadow-lg shadow-brand-600/20 hover:shadow-xl hover:shadow-brand-600/30 transition-all"
+                >
+                  <User className="h-4 w-4" />
+                  Open Dashboard
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <a
+                  href="#developers"
+                  className="group flex items-center justify-center gap-2.5 px-7 py-3.5 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all"
+                >
+                  <Bot className="h-4 w-4" />
+                  Connect Your Agent
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </a>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-600">
+                No credit card needed · Powered by{' '}
+                <a href="https://agents.karmapay.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 transition-colors">
+                  Karma Wallet
+                </a>
+                {' '}· Any AI agent
+              </p>
             </div>
-
-            <p className="mt-5 text-sm text-gray-500">
-              No credit card needed · Powered by{' '}
-              <a href="https://agents.karmapay.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-300 transition-colors">Karma Agent Wallet</a>
-              {' '}· Products, flights, hotels & more · Any AI agent
-            </p>
-          </div>
-
-          {/* Hero Visual — Animated Chat Demo */}
-          <div className="mt-16 max-w-3xl mx-auto">
-            <HeroChat />
           </div>
         </div>
       </section>
@@ -209,7 +234,7 @@ export default function LandingPage() {
             BUILT TO WORK WITH ANY AI AGENT
           </p>
           <div className="flex items-center justify-center gap-12 flex-wrap text-gray-600">
-            <span className="text-lg font-bold">OpenClawd</span>
+            <span className="text-lg font-bold">OpenClaw</span>
             <span className="text-lg font-bold">ChatGPT</span>
             <span className="text-lg font-bold">Claude</span>
             <span className="text-lg font-bold">Gemini</span>
@@ -218,61 +243,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── How It Works ─── */}
-      <section id="how-it-works" className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-sm font-semibold text-brand-400 uppercase tracking-wider mb-3">
-              How It Works
-            </p>
-            <h2 className="text-4xl font-bold text-white">
-              From conversation to confirmation in 4 steps
-            </h2>
-            <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
-              Your AI agent handles everything — shopping, booking, ordering. You just talk.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <StepCard
-              step={1}
-              icon={MessageSquare}
-              title="You Talk"
-              description={'"Book me a flight to Tokyo next week" or "Order me running shoes, size 10."'}
-              color="brand"
-            />
-            <StepCard
-              step={2}
-              icon={Search}
-              title="Agent Searches"
-              description="Swiftbuy searches across airlines, hotels, retailers, and services in real-time."
-              color="purple"
-            />
-            <StepCard
-              step={3}
-              icon={CreditCard}
-              title="Karma Pays"
-              description="Your Karma Agent Wallet handles USDC off-ramping to fiat automatically. No cards needed."
-              color="green"
-            />
-            <StepCard
-              step={4}
-              icon={Package}
-              title="Confirmed"
-              description="Booking confirmed, tracking provided. Flights ticketed, packages shipped, reservations set."
-              color="orange"
-            />
-          </div>
-
-          {/* Architecture diagram */}
-          <div className="mt-20 bg-white/[0.03] rounded-3xl p-8 md:p-12 border border-white/5">
+      {/* ─── Architecture ─── */}
+      <section className="py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="bg-white/[0.03] rounded-3xl p-8 md:p-12 border border-white/5">
             <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-8 text-center">
               Architecture
             </p>
             <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-sm">
               <ArchBlock icon={User} label="User" sublabel="Natural language" />
               <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
-              <ArchBlock icon={Bot} label="AI Agent" sublabel="OpenClawd / GPT / Claude" />
+              <ArchBlock icon={Bot} label="AI Agent" sublabel="OpenClaw / GPT / Claude" />
               <ChevronRight className="h-5 w-5 text-gray-700 rotate-90 md:rotate-0" />
               <div className="bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-2xl p-5 text-center shadow-lg shadow-brand-600/20 min-w-[160px]">
                 <Zap className="h-6 w-6 mx-auto mb-2" />
@@ -373,7 +354,7 @@ export default function LandingPage() {
             <FeatureCard
               icon={Layers}
               title="Agent-Agnostic API"
-              description="RESTful API that works with any AI agent. OpenClawd, ChatGPT, Claude, or your custom bot."
+              description="RESTful API that works with any AI agent. OpenClaw, ChatGPT, Claude, or your custom bot."
             />
           </div>
         </div>
@@ -590,9 +571,8 @@ export default function LandingPage() {
             <div>
               <h4 className="text-sm font-semibold text-white mb-3">Product</h4>
               <ul className="space-y-2 text-sm text-gray-500">
-                <li><a href="#how-it-works" className="hover:text-gray-300 transition-colors">How It Works</a></li>
-                <li><a href="#features" className="hover:text-gray-300 transition-colors">Features</a></li>
                 <li><a href="#use-cases" className="hover:text-gray-300 transition-colors">Use Cases</a></li>
+                <li><a href="#features" className="hover:text-gray-300 transition-colors">Features</a></li>
                 <li><a href="#developers" className="hover:text-gray-300 transition-colors">API Docs</a></li>
               </ul>
             </div>
@@ -621,12 +601,36 @@ export default function LandingPage() {
               Powered by{' '}
               <a href="https://agents.karmapay.xyz/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400 transition-colors">
                 Karma Agent Wallet
-              </a>{' '}
-              · Built for the AI agent economy
+              </a>
+              {' '}· Built for the AI agent economy
             </p>
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/* ─── Hero Step (compact) ─── */
+
+function HeroStep({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400 text-sm font-bold">
+        {number}
+      </div>
+      <div>
+        <p className="font-semibold text-white text-[15px] leading-tight">{title}</p>
+        <p className="text-sm text-gray-500 mt-0.5 leading-relaxed">{description}</p>
+      </div>
     </div>
   );
 }
@@ -678,42 +682,6 @@ function ScrollRow({
 }
 
 /* ─── Sub-components ─── */
-
-function StepCard({
-  step,
-  icon: Icon,
-  title,
-  description,
-  color,
-}: {
-  step: number;
-  icon: any;
-  title: string;
-  description: string;
-  color: string;
-}) {
-  const colorMap: Record<string, string> = {
-    brand: 'from-brand-500 to-brand-600',
-    purple: 'from-purple-500 to-purple-600',
-    green: 'from-emerald-500 to-emerald-600',
-    orange: 'from-orange-500 to-orange-600',
-  };
-
-  return (
-    <div className="relative text-center">
-      <div
-        className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colorMap[color]} flex items-center justify-center mx-auto shadow-lg`}
-      >
-        <Icon className="h-6 w-6 text-white" />
-      </div>
-      <div className="absolute -top-2 -right-2 md:right-auto md:left-1/2 md:translate-x-5 md:-translate-y-0 w-7 h-7 rounded-full bg-white text-gray-900 text-xs font-bold flex items-center justify-center">
-        {step}
-      </div>
-      <h3 className="mt-5 text-lg font-bold text-white">{title}</h3>
-      <p className="mt-2 text-sm text-gray-400 leading-relaxed">{description}</p>
-    </div>
-  );
-}
 
 function FeatureCard({
   icon: Icon,
