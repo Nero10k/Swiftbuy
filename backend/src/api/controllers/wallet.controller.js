@@ -5,7 +5,7 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 /**
- * Setup Karma Wallet — register + start KYC
+ * Setup Karma Wallet — register new account + start KYC
  * POST /api/v1/wallet/setup
  */
 const setupKarma = async (req, res, next) => {
@@ -51,6 +51,113 @@ const setupKarma = async (req, res, next) => {
         kycStatus: user.karma.kycStatus,
         kycUrl,
         message: 'Karma account created. Complete KYC to enable spending.',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Connect an existing Karma account — user already has sk_live key
+ * POST /api/v1/wallet/connect
+ */
+const connectExisting = async (req, res, next) => {
+  try {
+    const { skLive } = req.body;
+
+    if (!skLive || !skLive.startsWith('sk_live_')) {
+      throw new AppError(
+        'A valid Karma owner key (sk_live_...) is required.',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    const user = await User.findById(req.user._id);
+
+    // If already connected, tell them
+    if (user.karma?.accountId && user.karma?.skLive === skLive) {
+      const status = karmaClient.checkStatus(user);
+      return res.json({
+        success: true,
+        data: {
+          alreadyConnected: true,
+          ...status,
+          message: 'This Karma account is already connected.',
+        },
+      });
+    }
+
+    logger.info(`Connecting existing Karma account for user ${user._id}`);
+
+    // 1. Verify the key works by checking KYC status
+    const { status: kycStatus } = await karmaClient.getKycStatus(skLive);
+
+    // 2. Save owner key + KYC status
+    user.karma = {
+      ...user.karma,
+      skLive,
+      kycStatus: kycStatus || 'none',
+    };
+
+    // 3. If KYC is approved, try to pull in existing cards
+    if (kycStatus === 'approved') {
+      try {
+        const cards = await karmaClient.listCards(skLive);
+        const cardList = cards.cards || cards || [];
+
+        if (cardList.length > 0) {
+          // Use the first card (or the one named "Swiftbuy" if it exists)
+          const swiftbuyCard = cardList.find((c) => c.name?.toLowerCase().includes('swiftbuy'));
+          const card = swiftbuyCard || cardList[0];
+
+          user.karma.cardId = card.card_id || card.id;
+          user.karma.skAgent = card.agent_api_key || card.sk_agent;
+          user.karma.depositAddress = card.deposit_address;
+          user.karma.cardLast4 = card.last4;
+          user.karma.cardFrozen = card.frozen || false;
+          user.walletAddress = card.deposit_address;
+
+          logger.info(`Imported existing Karma card ****${card.last4} for user ${user._id}`);
+        } else {
+          // KYC approved but no card yet — create one for Swiftbuy
+          const newCard = await karmaClient.createCard(skLive, {
+            name: `Swiftbuy - ${user.name}`,
+            perTxnLimit: 500,
+            dailyLimit: 1000,
+            monthlyLimit: 5000,
+          });
+
+          user.karma.cardId = newCard.cardId;
+          user.karma.skAgent = newCard.skAgent;
+          user.karma.depositAddress = newCard.depositAddress;
+          user.karma.cardLast4 = newCard.last4;
+          user.walletAddress = newCard.depositAddress;
+
+          logger.info(`Created Swiftbuy card ****${newCard.last4} for existing Karma user ${user._id}`);
+        }
+      } catch (cardError) {
+        logger.warn(`Could not import/create card: ${cardError.message}`);
+      }
+    }
+
+    await user.save();
+
+    const status = karmaClient.checkStatus(user);
+
+    res.json({
+      success: true,
+      data: {
+        ...status,
+        kycStatus: user.karma.kycStatus,
+        cardLast4: user.karma.cardLast4 || null,
+        depositAddress: user.karma.depositAddress || null,
+        message: status.ready
+          ? `Karma account connected! Card ****${user.karma.cardLast4} is ready to spend.`
+          : kycStatus === 'approved'
+          ? 'Karma account connected. Setting up your card...'
+          : 'Karma account connected. KYC verification is still pending.',
       },
     });
   } catch (error) {
@@ -399,6 +506,7 @@ const getWalletStatus = async (req, res, next) => {
 
 module.exports = {
   setupKarma,
+  connectExisting,
   getKycStatus,
   getBalance,
   getTransactions,

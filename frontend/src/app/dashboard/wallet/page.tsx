@@ -18,6 +18,7 @@ import {
   AlertCircle,
   CreditCard,
   Snowflake,
+  Link2,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
@@ -47,16 +48,24 @@ export default function WalletPage() {
     enabled: statusData?.ready === true,
   });
 
-  // Setup mutation
+  // Setup mutation (new users)
   const setupMutation = useMutation({
     mutationFn: () => walletApi.setup(),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['wallet-status'] });
-      // Open KYC URL if available
       const kycUrl = res.data.data.kycUrl;
       if (kycUrl) {
         window.open(kycUrl, '_blank');
       }
+    },
+  });
+
+  // Connect existing Karma account
+  const connectMutation = useMutation({
+    mutationFn: (skLive: string) => walletApi.connectExisting(skLive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wallet-status'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
   });
 
@@ -116,56 +125,7 @@ export default function WalletPage() {
 
   /* ─── State: Not connected — show setup ─── */
   if (!isConnected) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Wallet</h1>
-          <p className="text-sm text-gray-500 mt-1">Connect your Karma Agent Card to start shopping</p>
-        </div>
-
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center max-w-lg mx-auto">
-          <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-5">
-            <CreditCard className="h-8 w-8 text-brand-400" />
-          </div>
-          <h2 className="text-lg font-bold text-white">Set Up Karma Wallet</h2>
-          <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
-            Karma gives your AI agent a virtual credit card funded with USDC.
-            Accepted at 150M+ merchants worldwide.
-          </p>
-
-          <div className="mt-6 space-y-3 text-left max-w-xs mx-auto">
-            <StepIndicator step={1} label="Create account" description="We register you with Karma" done={false} active />
-            <StepIndicator step={2} label="Verify identity" description="Quick KYC — ID + selfie" done={false} />
-            <StepIndicator step={3} label="Fund with USDC" description="Send USDC to your deposit address" done={false} />
-          </div>
-
-          <button
-            onClick={() => setupMutation.mutate()}
-            disabled={setupMutation.isPending}
-            className="mt-8 inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
-          >
-            {setupMutation.isPending ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Setting up...</>
-            ) : (
-              <><Wallet className="h-4 w-4" /> Set Up Karma Wallet</>
-            )}
-          </button>
-
-          {setupMutation.isError && (
-            <p className="mt-3 text-sm text-red-400">
-              {(setupMutation.error as any)?.response?.data?.error?.message || 'Setup failed. Try again.'}
-            </p>
-          )}
-
-          <p className="text-[11px] text-gray-600 mt-4">
-            Powered by{' '}
-            <a href="https://agents.karmapay.xyz" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400">
-              Karma Agent Card
-            </a>
-          </p>
-        </div>
-      </div>
-    );
+    return <SetupView setupMutation={setupMutation} connectMutation={connectMutation} />;
   }
 
   /* ─── State: Connected but KYC pending ─── */
@@ -451,6 +411,171 @@ function LimitCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
       <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{label}</p>
       <p className="text-lg font-bold text-white mt-1">{value}</p>
+    </div>
+  );
+}
+
+function SetupView({
+  setupMutation,
+  connectMutation,
+}: {
+  setupMutation: any;
+  connectMutation: any;
+}) {
+  const [mode, setMode] = useState<'choose' | 'new' | 'existing'>('choose');
+  const [skLiveInput, setSkLiveInput] = useState('');
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-white">Wallet</h1>
+        <p className="text-sm text-gray-500 mt-1">Connect your Karma Agent Card to start shopping</p>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center max-w-lg mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-5">
+          <CreditCard className="h-8 w-8 text-brand-400" />
+        </div>
+
+        {mode === 'choose' && (
+          <>
+            <h2 className="text-lg font-bold text-white">Connect Karma Wallet</h2>
+            <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
+              Karma gives your AI agent a virtual credit card funded with USDC.
+              Accepted at 150M+ merchants worldwide.
+            </p>
+
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-sm mx-auto">
+              <button
+                onClick={() => setMode('new')}
+                className="flex flex-col items-center gap-2 p-5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-brand-500/30 hover:bg-brand-500/[0.04] transition-all"
+              >
+                <Wallet className="h-6 w-6 text-brand-400" />
+                <span className="text-sm font-semibold text-white">New to Karma</span>
+                <span className="text-[11px] text-gray-500">Create a fresh account</span>
+              </button>
+
+              <button
+                onClick={() => setMode('existing')}
+                className="flex flex-col items-center gap-2 p-5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-emerald-500/30 hover:bg-emerald-500/[0.04] transition-all"
+              >
+                <Link2 className="h-6 w-6 text-emerald-400" />
+                <span className="text-sm font-semibold text-white">I have Karma</span>
+                <span className="text-[11px] text-gray-500">Connect existing account</span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode === 'new' && (
+          <>
+            <h2 className="text-lg font-bold text-white">Set Up Karma Wallet</h2>
+            <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
+              We&apos;ll create a Karma account using your email and guide you through verification.
+            </p>
+
+            <div className="mt-6 space-y-3 text-left max-w-xs mx-auto">
+              <StepIndicator step={1} label="Create account" description="We register you with Karma" done={false} active />
+              <StepIndicator step={2} label="Verify identity" description="Quick KYC — ID + selfie" done={false} />
+              <StepIndicator step={3} label="Fund with USDC" description="Send USDC to your deposit address" done={false} />
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <button
+                onClick={() => setupMutation.mutate()}
+                disabled={setupMutation.isPending}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+              >
+                {setupMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Setting up...</>
+                ) : (
+                  <><Wallet className="h-4 w-4" /> Create Karma Account</>
+                )}
+              </button>
+
+              <button
+                onClick={() => setMode('choose')}
+                className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
+
+            {setupMutation.isError && (
+              <p className="mt-3 text-sm text-red-400">
+                {(setupMutation.error as any)?.response?.data?.error?.message || 'Setup failed. Try again.'}
+              </p>
+            )}
+          </>
+        )}
+
+        {mode === 'existing' && (
+          <>
+            <h2 className="text-lg font-bold text-white">Connect Existing Account</h2>
+            <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
+              Paste your Karma owner key to link your existing account.
+              Find it in your Karma dashboard under API Keys.
+            </p>
+
+            <div className="mt-6 max-w-sm mx-auto">
+              <label className="block text-left text-xs text-gray-500 font-medium mb-1.5">
+                Owner Key (sk_live_...)
+              </label>
+              <input
+                type="password"
+                value={skLiveInput}
+                onChange={(e) => setSkLiveInput(e.target.value)}
+                placeholder="sk_live_..."
+                className="w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50"
+              />
+              <p className="text-[10px] text-gray-600 mt-1.5 text-left">
+                Your key is stored securely and never shared.
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <button
+                onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
+                disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+              >
+                {connectMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Connecting...</>
+                ) : (
+                  <><Link2 className="h-4 w-4" /> Connect Account</>
+                )}
+              </button>
+
+              <button
+                onClick={() => { setMode('choose'); setSkLiveInput(''); }}
+                className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
+
+            {connectMutation.isSuccess && (
+              <div className="mt-4 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
+                <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
+                {connectMutation.data?.data?.data?.message || 'Karma account connected!'}
+              </div>
+            )}
+
+            {connectMutation.isError && (
+              <p className="mt-3 text-sm text-red-400">
+                {(connectMutation.error as any)?.response?.data?.error?.message || 'Invalid key or connection failed. Check your key and try again.'}
+              </p>
+            )}
+          </>
+        )}
+
+        <p className="text-[11px] text-gray-600 mt-6">
+          Powered by{' '}
+          <a href="https://agents.karmapay.xyz" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400">
+            Karma Agent Card
+          </a>
+        </p>
+      </div>
     </div>
   );
 }

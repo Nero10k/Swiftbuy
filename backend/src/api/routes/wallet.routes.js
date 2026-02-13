@@ -7,7 +7,8 @@ const { authenticateUser } = require('../middleware/auth');
 router.use(authenticateUser);
 
 // Karma setup & KYC
-router.post('/setup', walletController.setupKarma);
+router.post('/setup', walletController.setupKarma);           // New users
+router.post('/connect', walletController.connectExisting);     // Existing Karma users
 router.get('/kyc-status', walletController.getKycStatus);
 
 // Wallet status (for dashboard)
