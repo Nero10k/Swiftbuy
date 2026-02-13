@@ -129,7 +129,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ─── Hero — Side by Side ─── */}
-      <section className="relative pt-28 pb-24 overflow-hidden min-h-[100vh] flex items-center">
+      <section className="relative pt-24 pb-20 overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 bg-gradient-to-b from-brand-950/50 to-gray-950" />
         <div className="absolute top-20 left-1/4 w-[600px] h-[600px] bg-brand-500/5 rounded-full blur-3xl" />
