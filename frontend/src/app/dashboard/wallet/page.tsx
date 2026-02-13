@@ -48,15 +48,9 @@ export default function WalletPage() {
     enabled: statusData?.ready === true,
   });
 
-  // Setup mutation (new users — includes KYC data)
+  // Setup mutation (new users — Karma handles KYC via SumSub link)
   const setupMutation = useMutation({
-    mutationFn: (kycData: {
-      firstName: string;
-      lastName: string;
-      birthDate: string;
-      nationalId: string;
-      countryOfIssue: string;
-    }) => walletApi.setup(kycData),
+    mutationFn: () => walletApi.setup(),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['wallet-status'] });
       const kycUrl = res.data.data.kycUrl;
@@ -428,32 +422,8 @@ function SetupView({
   setupMutation: any;
   connectMutation: any;
 }) {
-  const { user } = useAppStore();
   const [mode, setMode] = useState<'choose' | 'new' | 'existing'>('choose');
   const [skLiveInput, setSkLiveInput] = useState('');
-
-  // KYC form state — pre-fill name from user profile
-  const nameParts = (user?.name || '').split(' ');
-  const [firstName, setFirstName] = useState(nameParts[0] || '');
-  const [lastName, setLastName] = useState(nameParts.slice(1).join(' ') || '');
-  const [birthDate, setBirthDate] = useState('');
-  const [nationalId, setNationalId] = useState('');
-  const [countryOfIssue, setCountryOfIssue] = useState(
-    user?.shippingAddresses?.find((a: any) => a.isDefault)?.country ||
-    user?.shippingAddresses?.[0]?.country ||
-    ''
-  );
-
-  const hasAddress = (user?.shippingAddresses?.length ?? 0) > 0;
-  const kycFormValid = firstName && lastName && birthDate && nationalId && countryOfIssue && hasAddress;
-
-  const inputClass =
-    'w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50';
-
-  const handleSetup = () => {
-    if (!kycFormValid) return;
-    setupMutation.mutate({ firstName, lastName, birthDate, nationalId, countryOfIssue });
-  };
 
   return (
     <div className="space-y-6">
@@ -501,106 +471,20 @@ function SetupView({
           <>
             <h2 className="text-lg font-bold text-white">Set Up Karma Wallet</h2>
             <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
-              We need a few details for identity verification. Your address is pulled from your shipping info.
+              We&apos;ll create your Karma account and open identity verification.
+              No personal info passes through Swiftbuy — Karma handles it securely.
             </p>
 
-            {!hasAddress && (
-              <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm">
-                <AlertCircle className="h-4 w-4 inline mr-1.5" />
-                Add a shipping address in{' '}
-                <a href="/dashboard/settings" className="underline hover:text-yellow-300">
-                  Settings
-                </a>{' '}
-                first.
-              </div>
-            )}
-
-            <div className="mt-6 space-y-4 text-left max-w-sm mx-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-500 font-medium mb-1">First Name</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="John"
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 font-medium mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Doe"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 font-medium mb-1">Date of Birth</label>
-                <input
-                  type="date"
-                  value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 font-medium mb-1">
-                  National ID / Passport Number
-                </label>
-                <input
-                  type="text"
-                  value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
-                  placeholder="e.g. AB1234567"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 font-medium mb-1">Country of Issue</label>
-                <select
-                  value={countryOfIssue}
-                  onChange={(e) => setCountryOfIssue(e.target.value)}
-                  className={`${inputClass} appearance-none`}
-                >
-                  <option value="">Select country...</option>
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {hasAddress && (
-                <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.05]">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-1">
-                    Address (from shipping)
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {(() => {
-                      const addr =
-                        user?.shippingAddresses?.find((a: any) => a.isDefault) ||
-                        user?.shippingAddresses?.[0];
-                      return addr
-                        ? `${addr.street}, ${addr.city}, ${addr.state} ${addr.zipCode}, ${addr.country}`
-                        : '—';
-                    })()}
-                  </p>
-                </div>
-              )}
+            <div className="mt-6 space-y-3 text-left max-w-xs mx-auto">
+              <StepIndicator step={1} label="Create account" description="We register you with Karma" done={false} active />
+              <StepIndicator step={2} label="Verify identity" description="Karma opens a secure ID check" done={false} />
+              <StepIndicator step={3} label="Fund with USDC" description="Send USDC to your deposit address" done={false} />
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-3">
               <button
-                onClick={handleSetup}
-                disabled={setupMutation.isPending || !kycFormValid}
+                onClick={() => setupMutation.mutate()}
+                disabled={setupMutation.isPending}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
               >
                 {setupMutation.isPending ? (
@@ -622,6 +506,13 @@ function SetupView({
               <p className="mt-3 text-sm text-red-400">
                 {(setupMutation.error as any)?.response?.data?.error?.message || 'Setup failed. Try again.'}
               </p>
+            )}
+
+            {setupMutation.isSuccess && !setupMutation.data?.data?.data?.kycUrl && (
+              <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm">
+                <AlertCircle className="h-4 w-4 inline mr-1.5" />
+                Account created but verification didn&apos;t start. Click the button again to retry.
+              </div>
             )}
           </>
         )}
@@ -696,53 +587,3 @@ function SetupView({
     </div>
   );
 }
-
-/* ─── Country list for ID country of issue ─── */
-const COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'IN', name: 'India' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'GR', name: 'Greece' },
-  { code: 'HU', name: 'Hungary' },
-  { code: 'HR', name: 'Croatia' },
-  { code: 'BG', name: 'Bulgaria' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'QA', name: 'Qatar' },
-  { code: 'KW', name: 'Kuwait' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'EG', name: 'Egypt' },
-];

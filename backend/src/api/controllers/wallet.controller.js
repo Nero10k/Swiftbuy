@@ -8,15 +8,39 @@ const logger = require('../../utils/logger');
  * Setup Karma Wallet — register new account + start KYC
  * POST /api/v1/wallet/setup
  *
- * Body: { firstName, lastName, birthDate, nationalId, countryOfIssue }
- * Address is auto-populated from user's default shipping address.
+ * Karma handles identity verification via SumSub (kyc_url).
+ * No personal info is sent through our API — zero PII.
  */
 const setupKarma = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
-    // If already registered, just return status
-    if (user.karma?.accountId) {
+    // If already registered but KYC not started, retry KYC
+    if (user.karma?.accountId && user.karma?.skLive && !user.karma?.kycUrl) {
+      logger.info(`Retrying KYC for user ${user._id} (already registered)`);
+      try {
+        const { status: kycStatus, kycUrl } = await karmaClient.startKyc(user.karma.skLive);
+        user.karma.kycStatus = kycStatus || 'pending_verification';
+        user.karma.kycUrl = kycUrl;
+        await user.save();
+
+        return res.json({
+          success: true,
+          data: {
+            accountId: user.karma.accountId,
+            kycStatus: user.karma.kycStatus,
+            kycUrl,
+            message: 'KYC started. Open the verification link to complete identity check.',
+          },
+        });
+      } catch (kycError) {
+        logger.error(`KYC retry failed: ${kycError.message}`);
+        throw kycError;
+      }
+    }
+
+    // If already fully set up, return status
+    if (user.karma?.accountId && user.karma?.kycUrl) {
       const status = karmaClient.checkStatus(user);
       return res.json({
         success: true,
@@ -29,65 +53,45 @@ const setupKarma = async (req, res, next) => {
       });
     }
 
-    // Validate KYC fields
-    const { firstName, lastName, birthDate, nationalId, countryOfIssue } = req.body;
-
-    if (!firstName || !lastName || !birthDate || !nationalId || !countryOfIssue) {
-      throw new AppError(
-        'KYC info required: firstName, lastName, birthDate, nationalId, countryOfIssue',
-        400,
-        'VALIDATION_ERROR'
-      );
-    }
-
-    // Get default shipping address for KYC address fields
-    const defaultAddr = user.shippingAddresses?.find((a) => a.isDefault) || user.shippingAddresses?.[0];
-    if (!defaultAddr) {
-      throw new AppError(
-        'A shipping address is required. Please add one in Settings first.',
-        400,
-        'NO_ADDRESS'
-      );
-    }
-
     // 1. Register with Karma
     logger.info(`Setting up Karma wallet for user ${user._id} (${user.email})`);
     const { accountId, skLive } = await karmaClient.register(user.email);
 
-    // 2. Start KYC with personal info
-    const { status: kycStatus, kycUrl } = await karmaClient.startKyc(skLive, {
-      firstName,
-      lastName,
-      birthDate,
-      nationalId,
-      countryOfIssue,
-      address: {
-        line1: defaultAddr.street,
-        city: defaultAddr.city,
-        region: defaultAddr.state,
-        postalCode: defaultAddr.zipCode,
-        countryCode: defaultAddr.country,
-      },
-    });
-
-    // 3. Save to user
+    // Save immediately after register — so we NEVER re-register the same email
     user.karma = {
+      ...user.karma,
       accountId,
       skLive,
-      kycStatus: kycStatus || 'pending_verification',
-      kycUrl,
+      kycStatus: 'none',
     };
     await user.save();
+    logger.info(`Karma account registered for user ${user._id}: account=${accountId}`);
 
-    logger.info(`Karma wallet created for user ${user._id}: account=${accountId}`);
+    // 2. Start KYC — no body needed, Karma uses SumSub for identity verification
+    let kycStatus = 'none';
+    let kycUrl = null;
+    try {
+      const kycResult = await karmaClient.startKyc(skLive);
+      kycStatus = kycResult.status || 'pending_verification';
+      kycUrl = kycResult.kycUrl;
+
+      user.karma.kycStatus = kycStatus;
+      user.karma.kycUrl = kycUrl;
+      await user.save();
+    } catch (kycError) {
+      logger.warn(`KYC start failed (account saved, user can retry): ${kycError.message}`);
+      // Account is saved — user can retry KYC by clicking setup again
+    }
 
     res.status(201).json({
       success: true,
       data: {
         accountId,
-        kycStatus: user.karma.kycStatus,
+        kycStatus,
         kycUrl,
-        message: 'Karma account created. Complete KYC verification to enable spending.',
+        message: kycUrl
+          ? 'Karma account created. Open the verification link to complete identity check.'
+          : 'Karma account created. Click setup again to start identity verification.',
       },
     });
   } catch (error) {
