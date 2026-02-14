@@ -94,6 +94,9 @@ const orderSchema = new mongoose.Schema(
       retryCount: { type: Number, default: 0 },
       source: { type: String },
       failureReason: { type: String },
+      // Checkout engine metadata
+      checkoutLlmCalls: { type: Number },
+      checkoutUsedSavedFlow: { type: Boolean },
     },
 
     // Status history

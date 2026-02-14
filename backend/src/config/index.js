@@ -46,6 +46,17 @@ const config = {
     approvalThreshold: parseFloat(process.env.DEFAULT_APPROVAL_THRESHOLD) || 50,
     autoApproveBelow: parseFloat(process.env.AUTO_APPROVE_BELOW) || 25,
   },
+
+  // Checkout Engine (AI-driven browser automation)
+  checkout: {
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+    model: process.env.CHECKOUT_LLM_MODEL || 'claude-sonnet-4-20250514',
+    maxSteps: parseInt(process.env.CHECKOUT_MAX_STEPS, 10) || 25,
+    timeoutMs: parseInt(process.env.CHECKOUT_TIMEOUT_MS, 10) || 90000,
+    proxyUrl: process.env.CHECKOUT_PROXY_URL || '', // e.g. http://user:pass@proxy:port
+    headless: process.env.CHECKOUT_HEADLESS !== 'false', // default true
+    captchaSolverKey: process.env.CAPTCHA_SOLVER_KEY || '', // 2Captcha API key
+  },
 };
 
 module.exports = config;

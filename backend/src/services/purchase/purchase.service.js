@@ -3,6 +3,7 @@ const Transaction = require('../../models/Transaction');
 const Product = require('../../models/Product');
 const User = require('../../models/User');
 const karmaClient = require('../wallet/wallet.client');
+const checkoutAutomation = require('./checkout.automation');
 const searchService = require('../search/search.service');
 const notificationService = require('../notification/notification.service');
 const logger = require('../../utils/logger');
@@ -293,10 +294,14 @@ class PurchaseService {
   /**
    * Execute the full purchase pipeline
    *
-   * 1. Off-ramp USDC → fiat via Karma Wallet
-   * 2. Execute checkout on retailer (placeholder for now)
-   * 3. Update order with confirmation
-   * 4. Notify user with result
+   * 1. Verify USDC balance via Karma canSpend
+   * 2. Get virtual card details (number, CVV, expiry)
+   * 3. Launch AI checkout engine (Playwright + Claude vision)
+   *    - Tries saved flow first (no LLM, fast)
+   *    - Falls back to LLM-guided (screenshot→action loop)
+   *    - Records flow for future replays
+   * 4. Update order with retailer confirmation
+   * 5. Notify user with result
    */
   async executePurchase(orderMongoId) {
     const order = await Order.findById(orderMongoId);
@@ -401,21 +406,60 @@ class PurchaseService {
       logger.info(`Executing checkout for ${order.orderId} on ${order.product.retailer}`);
 
       // ────────────────────────────────────────────────────────
-      // TODO: Implement actual headless browser checkout
-      //
-      // For flights/hotels: redirect user to booking URL
-      // For products: automated checkout with Playwright
-      //
-      // For now: mark as confirmed (simulating successful checkout)
-      // The product URL is stored in order.product.url for manual
-      // completion or future automation.
+      // Automated checkout via AI-driven browser engine
+      // Falls back to mock if engine isn't configured (no API key)
       // ────────────────────────────────────────────────────────
+
+      let checkoutResult;
+
+      if (checkoutAutomation.isReady() && order.product.url) {
+        // Real checkout — get card details and run the automation engine
+        try {
+          const cardDetails = await karmaClient.getCardDetails(user.karma.skAgent);
+          const shippingAddress = order.shippingAddress;
+
+          checkoutResult = await checkoutAutomation.executeCheckout(
+            order,
+            cardDetails,
+            shippingAddress,
+            { email: user.email, name: user.name }
+          );
+
+          logger.info(`Checkout engine result for ${order.orderId}:`, {
+            success: checkoutResult.success,
+            retailerOrderId: checkoutResult.retailerOrderId,
+            executionMs: checkoutResult.executionMs,
+            llmCalls: checkoutResult.llmCalls,
+            usedSavedFlow: checkoutResult.usedSavedFlow,
+          });
+        } catch (checkoutError) {
+          logger.error(`Checkout automation failed for ${order.orderId}: ${checkoutError.message}`);
+          throw new AppError(
+            `Checkout failed on ${order.product.retailer}: ${checkoutError.message}`,
+            502,
+            'CHECKOUT_FAILED'
+          );
+        }
+      } else {
+        // Mock mode — checkout engine not configured or no product URL
+        logger.warn(`Checkout engine not available for ${order.orderId} (configured: ${checkoutAutomation.isReady()}, hasUrl: ${!!order.product.url}). Using mock.`);
+        checkoutResult = {
+          success: true,
+          retailerOrderId: generateId('ret'),
+          confirmationUrl: order.product.url || '',
+          executionMs: 0,
+          llmCalls: 0,
+          usedSavedFlow: false,
+        };
+      }
 
       order.status = 'confirmed';
       order.metadata.executionTimeMs = Date.now() - startTime;
+      order.metadata.checkoutLlmCalls = checkoutResult.llmCalls;
+      order.metadata.checkoutUsedSavedFlow = checkoutResult.usedSavedFlow;
       order.tracking = {
-        retailerOrderId: generateId('ret'),
-        trackingUrl: order.product.url || '',
+        retailerOrderId: checkoutResult.retailerOrderId || generateId('ret'),
+        trackingUrl: checkoutResult.confirmationUrl || order.product.url || '',
       };
       await order.save();
 
