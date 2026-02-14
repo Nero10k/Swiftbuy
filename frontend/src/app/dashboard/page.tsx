@@ -157,7 +157,8 @@ function SetupView({
   };
 
   // Determine which step is current
-  const currentStep = !hasAgents ? 1 : !walletConnected ? 2 : 3;
+  // Stay on step 1 while credentials are being shown so the user can copy them
+  const currentStep = (!hasAgents || newAgent) ? 1 : !walletConnected ? 2 : 3;
 
   return (
     <div className="space-y-8">
