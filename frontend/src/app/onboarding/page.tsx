@@ -8,13 +8,12 @@ import {
   Zap,
   MapPin,
   Ruler,
-  Wallet,
   ArrowRight,
   ArrowLeft,
   Check,
 } from 'lucide-react';
 
-const STEPS = ['Shipping Address', 'About You', 'Wallet'];
+const STEPS = ['Shipping Address', 'About You'];
 
 const COUNTRIES = [
   { code: 'US', name: 'United States', flag: '🇺🇸', phone: '+1', zip: 'ZIP Code', zipPlaceholder: '94105', state: 'State', statePlaceholder: 'CA' },
@@ -77,9 +76,6 @@ export default function OnboardingPage() {
     phone: '',
   });
 
-  // Wallet
-  const [walletAddress, setWalletAddress] = useState('');
-
   const handleNext = () => {
     if (step === 0) {
       if (!address.country) {
@@ -116,7 +112,7 @@ export default function OnboardingPage() {
           dressSize: profile.dressSize,
           notes: profile.notes,
         },
-        walletAddress: walletAddress || undefined,
+        walletAddress: undefined,
       });
 
       updateUser(res.data.data.user);
@@ -400,55 +396,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Wallet */}
-          {step === 2 && (
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-green-500/10 text-green-400">
-                  <Wallet className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">Connect Wallet</h2>
-                  <p className="text-sm text-gray-400">
-                    Link your USDC wallet to fund purchases
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 bg-white/[0.03] rounded-xl border border-white/[0.06]">
-                <h3 className="text-sm font-semibold text-white mb-2">How it works</h3>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  <li className="flex items-start gap-2">
-                    <span className="text-brand-400 font-bold mt-0.5">1.</span>
-                    Your wallet holds USDC (a stablecoin pegged 1:1 to USD)
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-brand-400 font-bold mt-0.5">2.</span>
-                    When your agent buys something, USDC is off-ramped to fiat automatically
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-brand-400 font-bold mt-0.5">3.</span>
-                    The fiat is used to pay the retailer — you get your item delivered
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-300">Wallet Address</label>
-                <input
-                  type="text"
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                  placeholder="0x... or your wallet address"
-                  className={`${inputClass} font-mono`}
-                />
-                <p className="text-xs text-gray-600 mt-1.5">
-                  Optional — you can connect your wallet later in Settings
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Navigation buttons */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/5">
             {step > 0 ? (
@@ -485,16 +432,6 @@ export default function OnboardingPage() {
 
           {/* Skip */}
           {step === 1 && (
-            <p className="text-center mt-4">
-              <button
-                onClick={handleNext}
-                className="text-sm text-gray-600 hover:text-gray-400"
-              >
-                Skip this step
-              </button>
-            </p>
-          )}
-          {step === 2 && (
             <p className="text-center mt-4">
               <button
                 onClick={handleComplete}
