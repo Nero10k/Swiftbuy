@@ -103,7 +103,11 @@ class GoogleShoppingScraper extends BaseScraper {
         return scoreB - scoreA;
       });
 
-      return products.slice(0, limit);
+      // Resolve Google redirect URLs → actual retailer URLs (for checkout engine)
+      const topProducts = products.slice(0, limit);
+      await this._resolveProductUrls(topProducts);
+
+      return topProducts;
     } catch (error) {
       logger.error('Google Shopping API error:', { query, message: error.message });
       throw error;
@@ -263,6 +267,119 @@ class GoogleShoppingScraper extends BaseScraper {
     if (product.url) score += 0.5;
     if (product.title && product.title.length > 20) score += 0.5;
     return score;
+  }
+
+  /**
+   * Resolve Google Shopping URLs to actual retailer product page URLs
+   *
+   * Serper's shopping API returns Google comparison page URLs, NOT direct retailer links.
+   * e.g. https://google.com/search?ibp=oshop&q=...
+   *
+   * We resolve them by doing a targeted organic search:
+   *   "Product Title" site:retailer.com
+   * This gives us the actual product page URL the checkout engine can navigate to.
+   */
+  async _resolveProductUrls(products) {
+    if (!this.apiKey) return;
+
+    const resolvePromises = products.map(async (product) => {
+      if (!product.url) return;
+
+      const url = product.url;
+
+      // Already a direct retailer URL — no resolution needed
+      if (!url.includes('google.com')) return;
+
+      // Try to find the direct product page via organic search
+      try {
+        // Build a targeted search query
+        const retailerDomain = this._getRetailerDomain(product.retailer);
+        const searchQuery = retailerDomain
+          ? `${product.title} site:${retailerDomain}`
+          : `${product.title} buy`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ q: searchQuery, num: 3 }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          logger.warn(`URL resolve search failed for "${product.title}": HTTP ${response.status}`);
+          return;
+        }
+
+        const data = await response.json();
+        const organicResults = data.organic || [];
+
+        // Pick the first organic result that's a real product page
+        for (const result of organicResults) {
+          if (result.link && !result.link.includes('google.com')) {
+            logger.info(`URL resolved: "${product.title.substring(0, 40)}" → ${result.link.substring(0, 80)}`);
+            product.url = result.link;
+            product._resolvedUrl = true;
+            return;
+          }
+        }
+
+        // No direct URL found — mark it
+        logger.warn(`Could not resolve direct URL for "${product.title.substring(0, 40)}" from ${product.retailer}`);
+        product._isGoogleShoppingPage = true;
+      } catch (err) {
+        logger.warn(`URL resolution failed for "${product.title?.substring(0, 40)}": ${err.message}`);
+      }
+    });
+
+    await Promise.allSettled(resolvePromises);
+
+    const resolved = products.filter((p) => p._resolvedUrl).length;
+    const unresolved = products.filter((p) => p._isGoogleShoppingPage).length;
+    if (resolved > 0 || unresolved > 0) {
+      logger.info(`URL resolution: ${resolved} resolved, ${unresolved} unresolved out of ${products.length} products`);
+    }
+  }
+
+  /**
+   * Map retailer name to domain for targeted site: search
+   */
+  _getRetailerDomain(retailer) {
+    if (!retailer) return null;
+
+    const domainMap = {
+      'Amazon': 'amazon.com',
+      'Walmart': 'walmart.com',
+      'Target': 'target.com',
+      'Best Buy': 'bestbuy.com',
+      'eBay': 'ebay.com',
+      'Etsy': 'etsy.com',
+      'Nike': 'nike.com',
+      'Adidas': 'adidas.com',
+      'Apple': 'apple.com',
+      'Allbirds': 'allbirds.com',
+      'Nordstrom': 'nordstrom.com',
+      "Macy's": 'macys.com',
+      'Zappos': 'zappos.com',
+      'REI': 'rei.com',
+      'Wayfair': 'wayfair.com',
+      'Home Depot': 'homedepot.com',
+      'Costco': 'costco.com',
+      'Newegg': 'newegg.com',
+      'Sephora': 'sephora.com',
+      'B&H Photo': 'bhphotovideo.com',
+      "Lowe's": 'lowes.com',
+      "Kohl's": 'kohls.com',
+      'Farfetch': 'farfetch.com',
+    };
+
+    return domainMap[retailer] || null;
   }
 }
 

@@ -8,6 +8,7 @@ const searchService = require('../search/search.service');
 const notificationService = require('../notification/notification.service');
 const logger = require('../../utils/logger');
 const { generateId } = require('../../utils/helpers');
+const config = require('../../config');
 const { AppError } = require('../../api/middleware/errorHandler');
 
 /**
@@ -70,23 +71,47 @@ class PurchaseService {
       address = this._getShippingAddress(user, shippingAddressId);
     }
 
+    // 3b. Detect missing info that could cause checkout to fail
+    const missingInfo = [];
+    const titleLower = (product.title || '').toLowerCase();
+    const categoryLower = (product.category || '').toLowerCase();
+    const isClothingOrShoes =
+      ['clothing', 'shoes', 'apparel', 'fashion', 'footwear'].some((cat) => categoryLower.includes(cat)) ||
+      /\b(shirts?|pants|jeans|shorts|skirts?|dress(es)?|jackets?|coats?|hoodi(e|es)|sweaters?|sneakers?|shoes?|boots?|sandals?|runners?|trainers?|loafers?|slip-?ons?|clogs?|heels?|flats?|leggings|tee|polo|blouse|size\s?\d)/i.test(titleLower) ||
+      /\b(air jordan|air max|air force|yeezy|ultraboost|new balance \d|converse|chuck taylor|vans old skool|adidas (gazelle|samba|superstar)|nike dunk)/i.test(titleLower);
+
+    if (needsShipping && !address) {
+      missingInfo.push({ field: 'shippingAddress', message: 'No shipping address on file. The user must add one in Dashboard → Settings before checkout can proceed.' });
+    }
+    if (needsShipping && address && !address.phone && !user.profile?.phone) {
+      missingInfo.push({ field: 'phone', message: 'No phone number on file. Many retailers require a phone number at checkout. The user can add one in Dashboard → Settings.' });
+    }
+    if (isClothingOrShoes) {
+      const sizes = user.profile?.sizes || {};
+      if (!sizes.shoeSize && !sizes.shirtSize && !sizes.pantsSize && !sizes.dressSize) {
+        missingInfo.push({ field: 'sizes', message: 'No clothing/shoe sizes on file. The checkout engine will guess a default size. Ask the user for their size before purchasing, or have them update their profile.' });
+      }
+    }
+
     // 4. Calculate total cost
     const shippingCost = product.shippingCost || 0;
     const totalAmount = product.price + shippingCost;
 
-    // 5. Check wallet balance via Karma can-spend
+    // 5. Check wallet balance via Karma can-spend (skip in mock mode)
     const karmaStatus = karmaClient.checkStatus(user);
-    if (karmaStatus.ready && user.karma?.skAgent) {
+    if (!config.checkout.mockCheckout && karmaStatus.ready && user.karma?.skAgent) {
       try {
         const spendCheck = await karmaClient.canSpend(user.karma.skAgent, totalAmount, 'USD');
         if (!spendCheck.allowed) {
+          const fees = spendCheck.fees != null ? spendCheck.fees.toFixed(2) : '0.00';
+          const avail = spendCheck.available != null ? spendCheck.available.toFixed(2) : 'unknown';
           throw new AppError(
-            `Insufficient balance. Required: $${totalAmount.toFixed(2)} (+ $${spendCheck.fees.toFixed(2)} fees), Available: $${spendCheck.available.toFixed(2)} USDC`,
+            `Insufficient balance. Required: $${totalAmount.toFixed(2)} (+ $${fees} fees), Available: $${avail} USDC`,
             400,
             'INSUFFICIENT_FUNDS'
           );
         }
-        logger.info(`Karma can-spend approved: $${totalAmount} (total with fees: $${spendCheck.total})`);
+        logger.info(`Karma can-spend approved: $${totalAmount} (total with fees: $${spendCheck.total || totalAmount})`);
       } catch (error) {
         if (error.code === 'INSUFFICIENT_FUNDS') throw error;
         logger.warn(`Karma can-spend check skipped: ${error.message}`);
@@ -95,8 +120,12 @@ class PurchaseService {
       logger.warn(`Karma wallet not ready for user ${user._id}, skipping balance check (status: ${karmaStatus.status})`);
     }
 
-    // 6. Check spending limits
-    await this._checkSpendingLimits(user, totalAmount);
+    // 6. Check spending limits (skip in mock mode)
+    if (!config.checkout.mockCheckout) {
+      await this._checkSpendingLimits(user, totalAmount);
+    } else {
+      logger.info(`🧪 MOCK mode — skipping spending limit check for $${totalAmount}`);
+    }
 
     // 7. Determine if auto-approve
     const shouldAutoApprove = this._shouldAutoApprove(user, totalAmount, autoApprove);
@@ -163,6 +192,9 @@ class PurchaseService {
         logger.error(`Auto-execute failed for ${orderId}:`, err.message);
       });
     }
+
+    // Attach missingInfo (non-persistent, for the API response only)
+    order._missingInfo = missingInfo;
 
     return order;
   }
@@ -317,17 +349,24 @@ class PurchaseService {
 
       logger.info(`Processing payment for ${order.orderId}: $${order.payment.amount}`);
 
+      const isMockMode = config.checkout.mockCheckout;
+      if (isMockMode) {
+        logger.info(`🧪 MOCK_CHECKOUT enabled — skipping real payment for ${order.orderId}`);
+      }
+
       // Check if Karma is ready — use real can-spend, otherwise mock
       const karmaStatus = karmaClient.checkStatus(user);
       let transferResult;
 
-      if (karmaStatus.ready && user.karma?.skAgent) {
+      if (!isMockMode && karmaStatus.ready && user.karma?.skAgent) {
         try {
           // Verify we can still spend
           const spendCheck = await karmaClient.canSpend(user.karma.skAgent, order.payment.amount, 'USD');
           if (!spendCheck.allowed) {
+            const reqTotal = spendCheck.total != null ? `$${spendCheck.total}` : `$${order.payment.amount}`;
+            const avail = spendCheck.available != null ? `$${spendCheck.available}` : 'unknown';
             throw new AppError(
-              `Insufficient USDC balance. Required: $${spendCheck.total}, Available: $${spendCheck.available}`,
+              `Insufficient USDC balance. Required: ${reqTotal}, Available: ${avail}`,
               400,
               'INSUFFICIENT_FUNDS'
             );
@@ -361,8 +400,8 @@ class PurchaseService {
           };
         }
       } else {
-        // Mock mode — Karma not connected
-        logger.warn(`Karma not ready for user ${user._id}, using mock payment`);
+        // Mock mode — Karma not connected or MOCK_CHECKOUT enabled
+        logger.warn(`Using mock payment for ${order.orderId} (mock: ${isMockMode}, karmaReady: ${karmaStatus.ready})`);
         transferResult = {
           transactionId: generateId('tx_mock'),
           status: 'completed',
@@ -411,22 +450,64 @@ class PurchaseService {
       // ────────────────────────────────────────────────────────
 
       let checkoutResult;
+      const isDryRun = config.checkout.dryRunCheckout;
 
-      if (checkoutAutomation.isReady() && order.product.url) {
-        // Real checkout — get card details and run the automation engine
+      // Determine if we should run the real checkout engine:
+      //   - Normal mode (!isMockMode): always run if ready
+      //   - Dry-run mode (isMockMode + dryRunCheckout): run with test card, stop before submit
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && order.product.url;
+
+      if (shouldRunRealCheckout) {
+        // Real checkout (or dry-run checkout)
         try {
-          const cardDetails = await karmaClient.getCardDetails(user.karma.skAgent);
+          // Verify we have a shipping address (required for physical products)
           const shippingAddress = order.shippingAddress;
+          if (!shippingAddress || !shippingAddress.street) {
+            throw new AppError(
+              'Shipping address is required for checkout. Please add an address in your Swiftbuy dashboard settings.',
+              400,
+              'NO_SHIPPING_ADDRESS'
+            );
+          }
+
+          // Get card details — real from Karma, or test card for dry-run
+          let cardDetails;
+          if (isDryRun) {
+            logger.info(`🧪 DRY-RUN CHECKOUT — using test Visa card for ${order.orderId}`);
+            cardDetails = {
+              number: '4111111111111111',
+              cvv: '123',
+              expiry: '12/2027',
+              expiryMonth: '12',
+              expiryYear: '2027',
+            };
+          } else {
+            cardDetails = await karmaClient.getCardDetails(user.karma.skAgent);
+          }
+
+          // Build enriched user context with profile data for the checkout engine
+          const userContext = {
+            email: user.email,
+            name: user.name,
+            phone: shippingAddress?.phone || user.profile?.phone || '',
+            profile: {
+              sizes: user.profile?.sizes || {},
+              gender: user.profile?.gender || '',
+              notes: user.profile?.notes || '',
+            },
+          };
 
           checkoutResult = await checkoutAutomation.executeCheckout(
             order,
             cardDetails,
             shippingAddress,
-            { email: user.email, name: user.name }
+            userContext,
+            { dryRun: isDryRun }
           );
 
           logger.info(`Checkout engine result for ${order.orderId}:`, {
             success: checkoutResult.success,
+            dryRun: isDryRun,
             retailerOrderId: checkoutResult.retailerOrderId,
             executionMs: checkoutResult.executionMs,
             llmCalls: checkoutResult.llmCalls,

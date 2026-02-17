@@ -105,3 +105,4 @@ chatMessageSchema.statics.getUserConversations = function (userId) {
 module.exports = mongoose.model('ChatMessage', chatMessageSchema);
 
 
+

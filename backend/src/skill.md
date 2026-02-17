@@ -33,8 +33,9 @@ Here is the full flow you follow for every purchase:
 5. You initiate the purchase → order created
 6. If approval needed → you ask the user "Should I go ahead?"
 7. User says yes → you approve the order
-8. Swiftbuy processes the payment + confirms
-9. You tell the user "Done! Here's your confirmation."
+8. Tell user "Processing now..." → wait 30 seconds
+9. Poll GET /orders/{orderId} every 15s until confirmed/failed
+10. Tell the user the final result
 ```
 
 **Everything happens in this conversation.** The user never needs to open a dashboard or click a link to approve.
@@ -84,7 +85,7 @@ GET /api/v1/agent/me
 
 ---
 
-### 1. Get User Profile
+### 1. Get User Profile (CALL BEFORE PURCHASING)
 
 **Call this after `/me`** to get the user's sizes, preferences, allergies, and addresses for personalization.
 
@@ -97,6 +98,19 @@ GET /api/v1/agent/users/{{user_id}}/profile
 - Food/restaurant → respect `profile.dietaryPreferences` and `profile.allergies`
 - Shipping → use the address marked `isDefault: true`
 - Style → read `profile.notes` for personal preferences
+
+**⚠️ CRITICAL for clothing, shoes, and apparel purchases:**
+
+Before calling `/purchase` for any clothing, shoe, or apparel item, **you MUST check** `profile.sizes`:
+- If `sizes.shoeSize` is empty and the user is buying shoes → **ASK** "What shoe size are you?" **before** creating the order
+- If `sizes.shirtSize` is empty and the user is buying a shirt/top → **ASK** for their shirt size
+- If no sizes are on file at all → **ASK** the user for the relevant size
+
+The checkout engine will receive the user's profile sizes and use them to select the correct option on the product page. If sizes are missing, it will guess a default — which could result in wrong-size orders and returns.
+
+**⚠️ Phone number:**
+
+If no phone number is on file (`profile.phone` is empty and no phone in shipping address), many retailers will block checkout. If the user is buying a physical product, mention: "I notice you don't have a phone number saved — some stores require one at checkout. Want to add one?"
 
 ---
 
@@ -182,6 +196,8 @@ POST /api/v1/agent/purchase
 
 **The response tells you what to do:**
 
+- If `order.missingInfo` is present → the checkout engine is warning you about missing data (sizes, phone, shipping address). **Tell the user** what's missing and ask them to provide it or acknowledge the risk before you approve the order. Example: "Heads up — I don't have your shoe size on file. The checkout will guess size 10 US. Is that right, or what's your size?"
+
 - If `requiresApproval: true` → the order needs user confirmation. **Ask them directly in chat:**
 
   > I've prepared your order:
@@ -209,14 +225,33 @@ POST /api/v1/agent/orders/{{orderId}}/approve
 }
 ```
 
-**Then tell the user:**
+**Then tell the user the order is processing (NOT confirmed yet):**
 
-> ✅ Confirmed! Your flight is booked.
+> 🔄 Order approved! Processing now...
 > - **Wizz Air** — Bucharest → Amsterdam, Feb 14, 6:30 AM
 > - **Total:** $55.00 from your USDC wallet
 > - **Order ID:** ord_abc123
 >
-> The payment is being processed now. I'll update you once everything is finalized.
+> I'm completing the purchase now — I'll update you in about 30 seconds.
+
+**⚠️ CRITICAL: You MUST poll for the result.** The checkout happens asynchronously (takes 30-90 seconds). After approving:
+
+1. Wait **30 seconds**
+2. Call `GET /api/v1/agent/orders/{{orderId}}` to check the status
+3. If status is `processing` or `purchasing` → wait 15 seconds and check again
+4. If status is `confirmed` → tell the user "✅ Done! Your order is confirmed."
+5. If status is `failed` → tell the user what went wrong and offer to retry
+
+```
+Example polling flow:
+
+[Approve] → "Processing your order..."
+[Wait 30s] → GET /orders/ord_abc123 → status: "purchasing"
+[Wait 15s] → GET /orders/ord_abc123 → status: "confirmed" ← DONE
+→ "✅ All done! Your Allbirds Tree Runners are ordered. Confirmation #: ret_abc123"
+```
+
+**Do NOT tell the user the order is "confirmed" until you've polled and the status is actually `confirmed`.** The approve endpoint only starts the process — the real checkout takes time.
 
 ---
 
@@ -336,6 +371,8 @@ You: "I found a few options near 94105. Note: I'm filtering for vegan since that
 - ❌ Don't list more than 3 options without asking — it's overwhelming
 - ❌ Don't forget to check dietary restrictions when ordering food
 - ❌ Don't forget to mention the shipping address for physical products
+- ❌ Don't purchase clothing/shoes without confirming the user's size — check the profile first, ask if missing
+- ❌ Don't ignore `missingInfo` warnings in the purchase response — address them before approving
 
 ---
 

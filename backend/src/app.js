@@ -64,12 +64,30 @@ app.get('/skill.md', (req, res) => {
 
 // Public product view endpoint (no auth — used by product detail page)
 const SearchSession = require('./models/SearchSession');
+const googleShoppingScraper = require('./services/scraper/google-shopping.scraper');
+
 app.get('/api/v1/products/session/:sessionId', async (req, res) => {
   try {
     const session = await SearchSession.findOne({ sessionId: req.params.sessionId });
     if (!session) {
       return res.status(404).json({ success: false, error: { code: 'SESSION_NOT_FOUND', message: 'Search session not found or expired' } });
     }
+
+    // Safety net: resolve any Google Shopping URLs that weren't resolved at search time
+    const unresolvedProducts = session.products.filter(
+      (p) => p.url && p.url.includes('google.com')
+    );
+
+    if (unresolvedProducts.length > 0 && googleShoppingScraper.isAvailable()) {
+      try {
+        await googleShoppingScraper._resolveProductUrls(unresolvedProducts);
+        // Persist the resolved URLs so this only happens once
+        await session.save();
+      } catch (resolveErr) {
+        // Non-fatal — serve whatever we have
+      }
+    }
+
     res.json({
       success: true,
       data: {

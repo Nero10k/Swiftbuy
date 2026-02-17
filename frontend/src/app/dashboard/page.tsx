@@ -623,10 +623,24 @@ function ActiveView({
                     <p className="text-sm font-medium text-white truncate">
                       {order.product?.title || 'Untitled Order'}
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      {order.product?.retailer && `${order.product.retailer} · `}
-                      {formatDate(order.createdAt)}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[11px] text-gray-500">
+                        {order.product?.retailer && `${order.product.retailer} · `}
+                        {formatDate(order.createdAt)}
+                      </p>
+                      {order.product?.url && (
+                        <a
+                          href={order.product.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] text-brand-400/60 hover:text-brand-400 transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          <span>View</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">

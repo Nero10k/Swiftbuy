@@ -51,11 +51,13 @@ const config = {
   checkout: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
     model: process.env.CHECKOUT_LLM_MODEL || 'claude-sonnet-4-20250514',
-    maxSteps: parseInt(process.env.CHECKOUT_MAX_STEPS, 10) || 25,
+    maxSteps: parseInt(process.env.CHECKOUT_MAX_STEPS, 10) || 40,
     timeoutMs: parseInt(process.env.CHECKOUT_TIMEOUT_MS, 10) || 90000,
     proxyUrl: process.env.CHECKOUT_PROXY_URL || '', // e.g. http://user:pass@proxy:port
     headless: process.env.CHECKOUT_HEADLESS !== 'false', // default true
     captchaSolverKey: process.env.CAPTCHA_SOLVER_KEY || '', // 2Captcha API key
+    mockCheckout: process.env.MOCK_CHECKOUT === 'true', // Force mock mode for testing (skips real payment + browser)
+    dryRunCheckout: process.env.DRY_RUN_CHECKOUT === 'true', // Run real browser checkout but STOP before final submit (no real payment)
   },
 };
 

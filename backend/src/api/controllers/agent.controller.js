@@ -66,8 +66,8 @@ const searchProducts = async (req, res, next) => {
             currencySymbol: geo.currencySymbol,
             retailer: p.retailer,
             url: p.url,
-            imageUrl: p.imageUrl || p.image,
-            image: p.image || p.imageUrl,
+            imageUrl: p.imageUrl || p.image || (p.images && p.images[0]) || '',
+            image: p.image || p.imageUrl || (p.images && p.images[0]) || '',
             rating: p.rating,
             reviewCount: p.reviewCount,
             description: p.description,
@@ -178,6 +178,14 @@ const initiatePurchase = async (req, res, next) => {
     const productTitle = order.product.title;
     const amount = order.payment.amount.toFixed(2);
     const retailer = order.product.retailer;
+    const missingInfo = order._missingInfo || [];
+
+    // Build missing-info warnings for the agent
+    let missingWarning = '';
+    if (missingInfo.length > 0) {
+      const warnings = missingInfo.map((m) => `⚠️ ${m.field}: ${m.message}`).join('\n');
+      missingWarning = `\n\nIMPORTANT — Missing information detected:\n${warnings}\nBefore approving, ask the user for this info or warn them the checkout may fail/use defaults.`;
+    }
 
     res.status(201).json({
       success: true,
@@ -191,14 +199,16 @@ const initiatePurchase = async (req, res, next) => {
             currency: order.payment.currency,
           },
           requiresApproval: isPending,
+          missingInfo: missingInfo.length > 0 ? missingInfo : undefined,
         },
         // Agent instructions — tells the agent exactly what to do
         agentMessage: isPending
           ? `I've prepared an order for "${productTitle}" at $${amount} from ${retailer}. This needs your approval before I can proceed. Should I go ahead and confirm this purchase?`
           : `Done! I've purchased "${productTitle}" for $${amount} from ${retailer}. The order is confirmed and being processed. Your order ID is ${order.orderId}.`,
-        agentInstructions: isPending
+        agentInstructions: (isPending
           ? `The order is pending approval. ASK THE USER to confirm. If they say yes/confirm/go ahead, call POST /api/v1/agent/orders/${order.orderId}/approve with {"user_id": "${user_id}"}. If they say no/cancel, call POST /api/v1/agent/orders/${order.orderId}/reject.`
-          : 'The order was auto-approved and is being processed. Inform the user it\'s confirmed. They can track it on their Swiftbuy dashboard.',
+          : 'The order was auto-approved and is being processed. Inform the user it\'s confirmed. They can track it on their Swiftbuy dashboard.'
+        ) + missingWarning,
       },
     });
   } catch (error) {
@@ -246,8 +256,8 @@ const approveOrder = async (req, res, next) => {
           amount: order.payment.amount,
           currency: order.payment.currency,
         },
-        agentMessage: `Great, confirmed! Your order for "${productTitle}" ($${amount} from ${retailer}) is now being processed. I'll let you know once it's confirmed. Your order ID is ${order.orderId}.`,
-        agentInstructions: `The order is now approved and executing. The system will off-ramp USDC and complete the purchase. You can check the status later with GET /api/v1/agent/orders/${order.orderId}. Inform the user their order is confirmed and being processed.`,
+        agentMessage: `Got it! Your order for "${productTitle}" ($${amount} from ${retailer}) is approved and being processed now. This usually takes 30-90 seconds. I'll check on it shortly.`,
+        agentInstructions: `IMPORTANT: The order is now approved but checkout is happening asynchronously (takes 30-90 seconds). You MUST poll for the final result. Wait 30 seconds, then call GET /api/v1/agent/orders/${order.orderId} to check the status. Keep polling every 15 seconds until status is "confirmed" or "failed". Tell the user: "Processing your order now, I'll update you in a moment..." Once status is "confirmed", relay the confirmation details. If "failed", tell the user what went wrong and offer to retry.`,
       },
     });
   } catch (error) {
@@ -556,7 +566,7 @@ const getAgentIdentity = async (req, res, next) => {
     let agentInstructions = '';
 
     if (agentUserId) {
-      const user = await User.findById(agentUserId).select('name email profile preferences shippingAddresses walletAddress');
+      const user = await User.findById(agentUserId).select('name email profile preferences shippingAddresses walletAddress karma');
       if (user) {
         // Detect user's country for geo-aware search
         const detectedCountry = getUserCountry(user.shippingAddresses);
@@ -566,7 +576,7 @@ const getAgentIdentity = async (req, res, next) => {
           userId: user._id.toString(),
           name: user.name,
           email: user.email,
-          hasWallet: !!user.walletAddress,
+          hasWallet: !!(user.karma?.skLive),
           hasAddress: user.shippingAddresses?.length > 0,
           hasProfile: !!(user.profile?.notes || user.profile?.gender),
           preferences: {

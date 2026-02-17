@@ -352,11 +352,24 @@ export default function ProductViewPage() {
                 )}
               </div>
 
-              {/* Retailer */}
-              <div className="flex items-center gap-2 mb-4 text-sm text-gray-400">
-                <span>
-                  Sold by <span className="text-white font-medium">{product.retailer}</span>
-                </span>
+              {/* Retailer + direct link */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <span>
+                    Sold by <span className="text-white font-medium">{product.retailer}</span>
+                  </span>
+                </div>
+                {product.url && !product.url.includes('google.com') && (
+                  <a
+                    href={product.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-1.5 text-xs text-brand-400/70 hover:text-brand-400 transition-colors truncate max-w-full"
+                  >
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{new URL(product.url).hostname.replace('www.', '')}{new URL(product.url).pathname.substring(0, 50)}{new URL(product.url).pathname.length > 50 ? '…' : ''}</span>
+                  </a>
+                )}
               </div>
 
               {/* Description */}
@@ -540,4 +553,5 @@ export default function ProductViewPage() {
     </div>
   );
 }
+
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { userApi } from '@/lib/api';
 import { formatUSD, formatDate, getStatusColor, getStatusLabel } from '@/lib/utils';
-import { Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -86,7 +86,20 @@ export default function OrdersPage() {
                           <Package className="h-4 w-4 text-gray-600" />
                         </div>
                       )}
-                      <span className="text-sm text-white max-w-[200px] truncate">{order.product?.title}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm text-white max-w-[200px] truncate block">{order.product?.title}</span>
+                        {order.product?.url && (
+                          <a
+                            href={order.product.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] text-brand-400/70 hover:text-brand-400 transition-colors mt-0.5"
+                          >
+                            <ExternalLink className="h-2.5 w-2.5" />
+                            View on {order.product.retailer || 'retailer'}
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-3.5 text-xs text-gray-500 font-mono">{order.orderId}</td>

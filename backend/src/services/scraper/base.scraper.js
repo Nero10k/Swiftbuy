@@ -69,3 +69,4 @@ class BaseScraper {
 module.exports = BaseScraper;
 
 
+

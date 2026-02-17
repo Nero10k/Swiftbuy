@@ -164,7 +164,7 @@ export default function WalletPage() {
           </div>
 
           <div className="mt-8 flex flex-col items-center gap-3">
-            {statusData?.kycUrl && (
+            {statusData?.kycUrl ? (
               <a
                 href={statusData.kycUrl}
                 target="_blank"
@@ -174,6 +174,18 @@ export default function WalletPage() {
                 <ExternalLink className="h-4 w-4" />
                 {kycStatus === 'rejected' ? 'Retry Verification' : 'Complete Verification'}
               </a>
+            ) : (
+              <button
+                onClick={() => setupMutation.mutate()}
+                disabled={setupMutation.isPending}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+              >
+                {setupMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Starting verification...</>
+                ) : (
+                  <><Shield className="h-4 w-4" /> Start Verification</>
+                )}
+              </button>
             )}
 
             <button
@@ -193,6 +205,13 @@ export default function WalletPage() {
             <div className="mt-4 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
               <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
               Verified! Your card has been created.
+            </div>
+          )}
+
+          {setupMutation.isError && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">
+              <AlertCircle className="h-4 w-4 inline mr-1.5" />
+              {(setupMutation.error as any)?.response?.data?.error?.message || 'Failed to start verification. Please try again.'}
             </div>
           )}
         </div>
