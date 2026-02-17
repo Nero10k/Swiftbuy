@@ -377,8 +377,8 @@ const connectWallet = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        message: 'Use POST /wallet/setup to set up your Karma Agent Card.',
-        redirect: '/wallet/setup',
+        message: 'Connect your Karma Agent Card at POST /wallet/connect.',
+        redirect: '/wallet/connect',
       },
     });
   } catch (error) {

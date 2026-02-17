@@ -5,119 +5,6 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 /**
- * Setup Karma Wallet — register new account + start KYC
- * POST /api/v1/wallet/setup
- *
- * Karma handles identity verification via SumSub (kyc_url).
- * No personal info is sent through our API — zero PII.
- */
-const setupKarma = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user._id);
-
-    // Build personal info from request body (for KYC)
-    const { firstName, lastName, birthDate, nationalId, countryOfIssue, address: kycAddress } = req.body || {};
-    const personalInfo = {};
-    if (firstName) personalInfo.firstName = firstName;
-    if (lastName) personalInfo.lastName = lastName;
-    if (birthDate) personalInfo.birthDate = birthDate;
-    if (nationalId) personalInfo.nationalId = nationalId;
-    if (countryOfIssue) personalInfo.countryOfIssue = countryOfIssue;
-    if (kycAddress) {
-      personalInfo.address = {
-        line1: kycAddress.line1,
-        city: kycAddress.city,
-        region: kycAddress.region,
-        postalCode: kycAddress.postalCode,
-        countryCode: kycAddress.countryCode,
-      };
-    }
-
-    // If already registered but KYC not started, retry KYC with personal info
-    if (user.karma?.skLive && !user.karma?.kycUrl) {
-      logger.info(`Retrying KYC for user ${user._id} (already registered)`);
-      try {
-        const { status: kycStatus, kycUrl } = await karmaClient.startKyc(user.karma.skLive, personalInfo);
-        user.karma.kycStatus = kycStatus || 'pending_verification';
-        user.karma.kycUrl = kycUrl;
-        await user.save();
-
-        return res.json({
-          success: true,
-          data: {
-            accountId: user.karma.accountId,
-            kycStatus: user.karma.kycStatus,
-            kycUrl,
-            message: 'KYC started. Open the verification link to complete identity check.',
-          },
-        });
-      } catch (kycError) {
-        logger.error(`KYC retry failed: ${kycError.message}`);
-        throw kycError;
-      }
-    }
-
-    // If already fully set up, return status
-    if (user.karma?.skLive && user.karma?.kycUrl) {
-      const status = karmaClient.checkStatus(user);
-      return res.json({
-        success: true,
-        data: {
-          alreadyRegistered: true,
-          ...status,
-          kycUrl: user.karma.kycUrl,
-          kycStatus: user.karma.kycStatus,
-        },
-      });
-    }
-
-    // 1. Register with Karma
-    logger.info(`Setting up Karma wallet for user ${user._id} (${user.email})`);
-    const { accountId, skLive } = await karmaClient.register(user.email);
-
-    // Save immediately after register — so we NEVER re-register the same email
-    user.karma = {
-      ...user.karma,
-      accountId,
-      skLive,
-      kycStatus: 'none',
-    };
-    await user.save();
-    logger.info(`Karma account registered for user ${user._id}: account=${accountId}`);
-
-    // 2. Start KYC with personal info
-    let kycStatus = 'none';
-    let kycUrl = null;
-    try {
-      const kycResult = await karmaClient.startKyc(skLive, personalInfo);
-      kycStatus = kycResult.status || 'pending_verification';
-      kycUrl = kycResult.kycUrl;
-
-      user.karma.kycStatus = kycStatus;
-      user.karma.kycUrl = kycUrl;
-      await user.save();
-    } catch (kycError) {
-      logger.warn(`KYC start failed (account saved, user can retry): ${kycError.message}`);
-      // Account is saved — user can retry KYC by clicking setup again
-    }
-
-    res.status(201).json({
-      success: true,
-      data: {
-        accountId,
-        kycStatus,
-        kycUrl,
-        message: kycUrl
-          ? 'Karma account created. Open the verification link to complete identity check.'
-          : 'Karma account created. Provide your personal info to start verification.',
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * Connect an existing Karma account — user already has sk_live key
  * POST /api/v1/wallet/connect
  */
@@ -200,16 +87,8 @@ const connectExisting = async (req, res, next) => {
         logger.warn(`Could not import/create card: ${cardError.message}`);
       }
     } else {
-      // KYC not yet approved — try to get/start KYC so user gets a verification link
-      try {
-        const kycResult = await karmaClient.startKyc(skLive);
-        user.karma.kycStatus = kycResult.status || 'pending_verification';
-        user.karma.kycUrl = kycResult.kycUrl;
-        logger.info(`KYC started for existing Karma user ${user._id}: ${kycResult.status}`);
-      } catch (kycError) {
-        logger.warn(`Could not start KYC for existing user: ${kycError.message}`);
-        // Not fatal — user can retry from the KYC pending screen
-      }
+      // KYC not yet approved — user needs to complete it on Karma dashboard
+      logger.info(`Karma account connected for user ${user._id} but KYC is ${kycStatus}. User should complete KYC at agents.karmapay.xyz`);
     }
 
     await user.save();
@@ -228,7 +107,7 @@ const connectExisting = async (req, res, next) => {
           ? `Karma account connected! Card ****${user.karma.cardLast4} is ready to spend.`
           : kycStatus === 'approved'
           ? 'Karma account connected. Setting up your card...'
-          : 'Karma account connected. KYC verification is still pending.',
+          : 'Karma account connected. Complete KYC verification at agents.karmapay.xyz to activate your card.',
       },
     });
   } catch (error) {
@@ -245,7 +124,7 @@ const getKycStatus = async (req, res, next) => {
     const user = await User.findById(req.user._id);
 
     if (!user.karma?.skLive) {
-      throw new AppError('Karma wallet not set up. Call POST /wallet/setup first.', 400, 'NO_KARMA_ACCOUNT');
+      throw new AppError('No Karma wallet connected. Connect your Karma account at POST /wallet/connect.', 400, 'NO_KARMA_ACCOUNT');
     }
 
     // Poll Karma for latest KYC status
@@ -576,7 +455,6 @@ const getWalletStatus = async (req, res, next) => {
 };
 
 module.exports = {
-  setupKarma,
   connectExisting,
   getKycStatus,
   getBalance,

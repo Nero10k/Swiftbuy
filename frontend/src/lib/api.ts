@@ -79,7 +79,6 @@ export const agentApi = {
 
 // Wallet (Karma)
 export const walletApi = {
-  setup: (personalInfo?: Record<string, any>) => api.post('/wallet/setup', personalInfo || {}),
   connectExisting: (skLive: string) => api.post('/wallet/connect', { skLive }),
   getKycStatus: () => api.get('/wallet/kyc-status'),
   getStatus: () => api.get('/wallet/status'),
