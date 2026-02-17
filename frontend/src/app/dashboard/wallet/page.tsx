@@ -306,8 +306,6 @@ function LimitCard({ label, value }: { label: string; value: string }) {
 /* ─── KYC Pending: connected but verification not done ─── */
 
 function KycPendingView({
-  kycStatus,
-  kycCheckMutation,
   connectMutation,
 }: {
   kycStatus: string;
@@ -399,35 +397,6 @@ function KycPendingView({
             )}
           </div>
         </div>
-      </div>
-
-      {/* Check verification status (for users who already connected but KYC pending) */}
-      <div className="text-center">
-        <button
-          onClick={() => kycCheckMutation.mutate()}
-          disabled={kycCheckMutation.isPending}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-        >
-          {kycCheckMutation.isPending ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...</>
-          ) : (
-            <><RefreshCw className="h-3.5 w-3.5" /> Check verification status</>
-          )}
-        </button>
-
-        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus === 'approved' && (
-          <div className="mt-3 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm inline-block">
-            <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
-            Verified! Your card has been created.
-          </div>
-        )}
-
-        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus && kycCheckMutation.data.data.data.kycStatus !== 'approved' && (
-          <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm inline-block">
-            <AlertCircle className="h-4 w-4 inline mr-1.5" />
-            Status: {kycCheckMutation.data.data.data.kycStatus}. Complete verification on Karma to continue.
-          </div>
-        )}
       </div>
 
       <p className="text-[11px] text-gray-600 text-center">
