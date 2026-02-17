@@ -50,7 +50,7 @@ export default function WalletPage() {
 
   // Setup mutation (new users — Karma handles KYC via SumSub link)
   const setupMutation = useMutation({
-    mutationFn: () => walletApi.setup(),
+    mutationFn: (personalInfo?: Record<string, any>) => walletApi.setup(personalInfo),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['wallet-status'] });
       const kycUrl = res.data.data.kycUrl;
@@ -131,91 +131,13 @@ export default function WalletPage() {
   /* ─── State: Connected but KYC pending ─── */
   if (kycStatus !== 'approved') {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Wallet</h1>
-          <p className="text-sm text-gray-500 mt-1">Complete verification to start spending</p>
-        </div>
-
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center max-w-lg mx-auto">
-          <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-5">
-            <Shield className="h-8 w-8 text-yellow-400" />
-          </div>
-          <h2 className="text-lg font-bold text-white">Identity Verification</h2>
-          <p className="text-sm text-gray-400 mt-2">
-            {kycStatus === 'pending_verification'
-              ? 'Complete your identity verification to activate your card.'
-              : kycStatus === 'rejected'
-              ? 'Your verification was rejected. Please try again or contact support.'
-              : 'Start the verification process.'}
-          </p>
-
-          <div className="mt-6 space-y-3 text-left max-w-xs mx-auto">
-            <StepIndicator step={1} label="Create account" description="Karma account created" done active={false} />
-            <StepIndicator
-              step={2}
-              label="Verify identity"
-              description={kycStatus === 'rejected' ? 'Verification failed' : 'ID + selfie verification'}
-              done={false}
-              active
-              error={kycStatus === 'rejected'}
-            />
-            <StepIndicator step={3} label="Fund with USDC" description="Send USDC to your address" done={false} />
-          </div>
-
-          <div className="mt-8 flex flex-col items-center gap-3">
-            {statusData?.kycUrl ? (
-              <a
-                href={statusData.kycUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors"
-              >
-                <ExternalLink className="h-4 w-4" />
-                {kycStatus === 'rejected' ? 'Retry Verification' : 'Complete Verification'}
-              </a>
-            ) : (
-              <button
-                onClick={() => setupMutation.mutate()}
-                disabled={setupMutation.isPending}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
-              >
-                {setupMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Starting verification...</>
-                ) : (
-                  <><Shield className="h-4 w-4" /> Start Verification</>
-                )}
-              </button>
-            )}
-
-            <button
-              onClick={() => kycCheckMutation.mutate()}
-              disabled={kycCheckMutation.isPending}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              {kycCheckMutation.isPending ? (
-                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...</>
-              ) : (
-                <><RefreshCw className="h-3.5 w-3.5" /> Check verification status</>
-              )}
-            </button>
-          </div>
-
-          {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus === 'approved' && (
-            <div className="mt-4 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
-              <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
-              Verified! Your card has been created.
-            </div>
-          )}
-
-          {setupMutation.isError && (
-            <div className="mt-4 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">
-              <AlertCircle className="h-4 w-4 inline mr-1.5" />
-              {(setupMutation.error as any)?.response?.data?.error?.message || 'Failed to start verification. Please try again.'}
-            </div>
-          )}
-        </div>
-      </div>
+      <KycPendingView
+        statusData={statusData}
+        kycStatus={kycStatus}
+        setupMutation={setupMutation}
+        kycCheckMutation={kycCheckMutation}
+        user={user}
+      />
     );
   }
 
@@ -430,6 +352,292 @@ function LimitCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
       <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{label}</p>
       <p className="text-lg font-bold text-white mt-1">{value}</p>
+    </div>
+  );
+}
+
+const KYC_COUNTRIES = [
+  { code: 'US', name: 'United States' }, { code: 'NL', name: 'Netherlands' }, { code: 'GB', name: 'United Kingdom' },
+  { code: 'DE', name: 'Germany' }, { code: 'FR', name: 'France' }, { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' }, { code: 'BE', name: 'Belgium' }, { code: 'AT', name: 'Austria' },
+  { code: 'CH', name: 'Switzerland' }, { code: 'ES', name: 'Spain' }, { code: 'IT', name: 'Italy' },
+  { code: 'PT', name: 'Portugal' }, { code: 'SE', name: 'Sweden' }, { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' }, { code: 'FI', name: 'Finland' }, { code: 'IE', name: 'Ireland' },
+  { code: 'PL', name: 'Poland' }, { code: 'CZ', name: 'Czech Republic' }, { code: 'RO', name: 'Romania' },
+  { code: 'JP', name: 'Japan' }, { code: 'SG', name: 'Singapore' }, { code: 'KR', name: 'South Korea' },
+  { code: 'NZ', name: 'New Zealand' }, { code: 'AE', name: 'UAE' },
+];
+
+function KycPendingView({
+  statusData,
+  kycStatus,
+  setupMutation,
+  kycCheckMutation,
+  user,
+}: {
+  statusData: any;
+  kycStatus: string;
+  setupMutation: any;
+  kycCheckMutation: any;
+  user: any;
+}) {
+  // Pre-fill from user profile + shipping address
+  const defaultAddress = user?.shippingAddresses?.find((a: any) => a.isDefault) || user?.shippingAddresses?.[0];
+  const nameParts = (defaultAddress?.fullName || user?.name || '').split(' ');
+
+  const [kycForm, setKycForm] = useState({
+    firstName: nameParts[0] || '',
+    lastName: nameParts.slice(1).join(' ') || '',
+    birthDate: '',
+    nationalId: '',
+    countryOfIssue: defaultAddress?.country || '',
+    line1: defaultAddress?.street || '',
+    city: defaultAddress?.city || '',
+    region: defaultAddress?.state || '',
+    postalCode: defaultAddress?.zipCode || '',
+    countryCode: defaultAddress?.country || '',
+  });
+
+  const inputClass = 'w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50';
+  const labelClass = 'block text-xs text-gray-400 font-medium mb-1';
+
+  const isFormValid = kycForm.firstName && kycForm.lastName && kycForm.birthDate && kycForm.countryOfIssue && kycForm.line1 && kycForm.city && kycForm.postalCode && kycForm.countryCode;
+
+  const handleSubmitKyc = () => {
+    setupMutation.mutate({
+      firstName: kycForm.firstName,
+      lastName: kycForm.lastName,
+      birthDate: kycForm.birthDate,
+      nationalId: kycForm.nationalId || undefined,
+      countryOfIssue: kycForm.countryOfIssue,
+      address: {
+        line1: kycForm.line1,
+        city: kycForm.city,
+        region: kycForm.region || undefined,
+        postalCode: kycForm.postalCode,
+        countryCode: kycForm.countryCode,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-white">Wallet</h1>
+        <p className="text-sm text-gray-500 mt-1">Complete verification to start spending</p>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 max-w-lg mx-auto">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
+            <Shield className="h-7 w-7 text-yellow-400" />
+          </div>
+          <h2 className="text-lg font-bold text-white">Identity Verification</h2>
+          <p className="text-sm text-gray-400 mt-1">
+            {statusData?.kycUrl
+              ? 'Complete your identity verification to activate your card.'
+              : 'Provide your details to start the verification process.'}
+          </p>
+        </div>
+
+        <div className="space-y-3 text-left max-w-xs mx-auto mb-6">
+          <StepIndicator step={1} label="Create account" description="Karma account created" done active={false} />
+          <StepIndicator
+            step={2}
+            label="Verify identity"
+            description={kycStatus === 'rejected' ? 'Verification failed' : 'ID + selfie verification'}
+            done={false}
+            active
+            error={kycStatus === 'rejected'}
+          />
+          <StepIndicator step={3} label="Fund with USDC" description="Send USDC to your address" done={false} />
+        </div>
+
+        {statusData?.kycUrl ? (
+          /* Already have KYC URL — show link to complete */
+          <div className="flex flex-col items-center gap-3">
+            <a
+              href={statusData.kycUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              {kycStatus === 'rejected' ? 'Retry Verification' : 'Complete Verification'}
+            </a>
+
+            <button
+              onClick={() => kycCheckMutation.mutate()}
+              disabled={kycCheckMutation.isPending}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              {kycCheckMutation.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...</>
+              ) : (
+                <><RefreshCw className="h-3.5 w-3.5" /> Check verification status</>
+              )}
+            </button>
+          </div>
+        ) : (
+          /* No KYC URL — show personal info form */
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>First Name *</label>
+                <input
+                  type="text"
+                  value={kycForm.firstName}
+                  onChange={(e) => setKycForm({ ...kycForm, firstName: e.target.value })}
+                  placeholder="John"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Last Name *</label>
+                <input
+                  type="text"
+                  value={kycForm.lastName}
+                  onChange={(e) => setKycForm({ ...kycForm, lastName: e.target.value })}
+                  placeholder="Doe"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Date of Birth *</label>
+                <input
+                  type="date"
+                  value={kycForm.birthDate}
+                  onChange={(e) => setKycForm({ ...kycForm, birthDate: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>National ID</label>
+                <input
+                  type="text"
+                  value={kycForm.nationalId}
+                  onChange={(e) => setKycForm({ ...kycForm, nationalId: e.target.value })}
+                  placeholder="ID number"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Country of ID Issue *</label>
+              <select
+                value={kycForm.countryOfIssue}
+                onChange={(e) => setKycForm({ ...kycForm, countryOfIssue: e.target.value, countryCode: e.target.value || kycForm.countryCode })}
+                className={inputClass}
+              >
+                <option value="">Select country</option>
+                {KYC_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="border-t border-white/[0.06] pt-4 mt-4">
+              <p className="text-xs text-gray-500 font-medium mb-3">Residential Address</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className={labelClass}>Street Address *</label>
+                  <input
+                    type="text"
+                    value={kycForm.line1}
+                    onChange={(e) => setKycForm({ ...kycForm, line1: e.target.value })}
+                    placeholder="123 Main St"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>City *</label>
+                    <input
+                      type="text"
+                      value={kycForm.city}
+                      onChange={(e) => setKycForm({ ...kycForm, city: e.target.value })}
+                      placeholder="Amsterdam"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>State / Province</label>
+                    <input
+                      type="text"
+                      value={kycForm.region}
+                      onChange={(e) => setKycForm({ ...kycForm, region: e.target.value })}
+                      placeholder="Noord-Holland"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Postal Code *</label>
+                    <input
+                      type="text"
+                      value={kycForm.postalCode}
+                      onChange={(e) => setKycForm({ ...kycForm, postalCode: e.target.value })}
+                      placeholder="1012 AB"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Country *</label>
+                    <select
+                      value={kycForm.countryCode}
+                      onChange={(e) => setKycForm({ ...kycForm, countryCode: e.target.value })}
+                      className={inputClass}
+                    >
+                      <option value="">Select</option>
+                      {KYC_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-gray-600 mt-2">
+              Your information is sent directly to Karma for identity verification. Swiftbuy does not store this data.
+            </p>
+
+            <button
+              onClick={handleSubmitKyc}
+              disabled={setupMutation.isPending || !isFormValid}
+              className="w-full mt-2 inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+            >
+              {setupMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Starting verification...</>
+              ) : (
+                <><Shield className="h-4 w-4" /> Start Verification</>
+              )}
+            </button>
+
+            {setupMutation.isError && (
+              <div className="mt-2 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4 inline mr-1.5" />
+                {(setupMutation.error as any)?.response?.data?.error?.message || 'Failed to start verification. Please try again.'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus === 'approved' && (
+          <div className="mt-4 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
+            <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
+            Verified! Your card has been created.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

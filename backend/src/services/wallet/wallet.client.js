@@ -69,13 +69,43 @@ class KarmaWalletClient {
   }
 
   /**
-   * Start KYC process — no body needed, Karma handles identity via SumSub link
+   * Start KYC process — sends personal info required by Karma/SumSub
    * @param {string} skLive - Owner key
+   * @param {Object} personalInfo - Required KYC fields
+   * @param {string} personalInfo.firstName
+   * @param {string} personalInfo.lastName
+   * @param {string} personalInfo.birthDate - YYYY-MM-DD
+   * @param {string} personalInfo.nationalId
+   * @param {string} personalInfo.countryOfIssue - 2-letter country code
+   * @param {Object} personalInfo.address
+   * @param {string} personalInfo.address.line1
+   * @param {string} personalInfo.address.city
+   * @param {string} personalInfo.address.region
+   * @param {string} personalInfo.address.postalCode
+   * @param {string} personalInfo.address.countryCode - 2-letter country code
    * @returns {{ status: string, kycUrl: string }}
    */
-  async startKyc(skLive) {
+  async startKyc(skLive, personalInfo = {}) {
     try {
-      const response = await this._client(skLive).post('/api/kyc');
+      const body = {};
+
+      // Include personal info if provided
+      if (personalInfo.firstName) body.firstName = personalInfo.firstName;
+      if (personalInfo.lastName) body.lastName = personalInfo.lastName;
+      if (personalInfo.birthDate) body.birthDate = personalInfo.birthDate;
+      if (personalInfo.nationalId) body.nationalId = personalInfo.nationalId;
+      if (personalInfo.countryOfIssue) body.countryOfIssue = personalInfo.countryOfIssue;
+      if (personalInfo.address) {
+        body.address = {
+          line1: personalInfo.address.line1,
+          city: personalInfo.address.city,
+          region: personalInfo.address.region,
+          postalCode: personalInfo.address.postalCode,
+          countryCode: personalInfo.address.countryCode,
+        };
+      }
+
+      const response = await this._client(skLive).post('/api/kyc', body);
 
       return {
         status: response.data.status,

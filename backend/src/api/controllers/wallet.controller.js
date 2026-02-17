@@ -15,11 +15,29 @@ const setupKarma = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
-    // If already registered but KYC not started, retry KYC
+    // Build personal info from request body (for KYC)
+    const { firstName, lastName, birthDate, nationalId, countryOfIssue, address: kycAddress } = req.body || {};
+    const personalInfo = {};
+    if (firstName) personalInfo.firstName = firstName;
+    if (lastName) personalInfo.lastName = lastName;
+    if (birthDate) personalInfo.birthDate = birthDate;
+    if (nationalId) personalInfo.nationalId = nationalId;
+    if (countryOfIssue) personalInfo.countryOfIssue = countryOfIssue;
+    if (kycAddress) {
+      personalInfo.address = {
+        line1: kycAddress.line1,
+        city: kycAddress.city,
+        region: kycAddress.region,
+        postalCode: kycAddress.postalCode,
+        countryCode: kycAddress.countryCode,
+      };
+    }
+
+    // If already registered but KYC not started, retry KYC with personal info
     if (user.karma?.skLive && !user.karma?.kycUrl) {
       logger.info(`Retrying KYC for user ${user._id} (already registered)`);
       try {
-        const { status: kycStatus, kycUrl } = await karmaClient.startKyc(user.karma.skLive);
+        const { status: kycStatus, kycUrl } = await karmaClient.startKyc(user.karma.skLive, personalInfo);
         user.karma.kycStatus = kycStatus || 'pending_verification';
         user.karma.kycUrl = kycUrl;
         await user.save();
@@ -67,11 +85,11 @@ const setupKarma = async (req, res, next) => {
     await user.save();
     logger.info(`Karma account registered for user ${user._id}: account=${accountId}`);
 
-    // 2. Start KYC — no body needed, Karma uses SumSub for identity verification
+    // 2. Start KYC with personal info
     let kycStatus = 'none';
     let kycUrl = null;
     try {
-      const kycResult = await karmaClient.startKyc(skLive);
+      const kycResult = await karmaClient.startKyc(skLive, personalInfo);
       kycStatus = kycResult.status || 'pending_verification';
       kycUrl = kycResult.kycUrl;
 
@@ -91,7 +109,7 @@ const setupKarma = async (req, res, next) => {
         kycUrl,
         message: kycUrl
           ? 'Karma account created. Open the verification link to complete identity check.'
-          : 'Karma account created. Click setup again to start identity verification.',
+          : 'Karma account created. Provide your personal info to start verification.',
       },
     });
   } catch (error) {
