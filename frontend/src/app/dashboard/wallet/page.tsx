@@ -121,6 +121,7 @@ export default function WalletPage() {
       <KycPendingView
         kycStatus={kycStatus}
         kycCheckMutation={kycCheckMutation}
+        connectMutation={connectMutation}
       />
     );
   }
@@ -307,10 +308,15 @@ function LimitCard({ label, value }: { label: string; value: string }) {
 function KycPendingView({
   kycStatus,
   kycCheckMutation,
+  connectMutation,
 }: {
   kycStatus: string;
   kycCheckMutation: any;
+  connectMutation: any;
 }) {
+  const [showConnect, setShowConnect] = useState(false);
+  const [skLiveInput, setSkLiveInput] = useState('');
+
   return (
     <div className="space-y-6">
       <div>
@@ -364,6 +370,88 @@ function KycPendingView({
           <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm">
             <AlertCircle className="h-4 w-4 inline mr-1.5" />
             Status: {kycCheckMutation.data.data.data.kycStatus}. Complete verification on Karma to continue.
+          </div>
+        )}
+      </div>
+
+      {/* Connect a different Karma account */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 max-w-lg mx-auto">
+        {!showConnect ? (
+          <button
+            onClick={() => setShowConnect(true)}
+            className="w-full flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <Link2 className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-white">Connect a different Karma account</p>
+                <p className="text-[11px] text-gray-500">Already have a verified account? Switch to it</p>
+              </div>
+            </div>
+            <ExternalLink className="h-4 w-4 text-gray-600 group-hover:text-gray-400 transition-colors" />
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <Link2 className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">Connect Existing Account</p>
+                <p className="text-[11px] text-gray-500">Paste your Karma owner key</p>
+              </div>
+            </div>
+
+            <div>
+              <input
+                type="password"
+                value={skLiveInput}
+                onChange={(e) => setSkLiveInput(e.target.value)}
+                placeholder="sk_live_..."
+                className="w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50"
+              />
+              <p className="text-[10px] text-gray-600 mt-1.5">
+                Find this in your{' '}
+                <a href="https://agents.karmapay.xyz/dashboard" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400">
+                  Karma dashboard
+                </a>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
+                disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60"
+              >
+                {connectMutation.isPending ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Connecting...</>
+                ) : (
+                  <><Link2 className="h-3.5 w-3.5" /> Connect</>
+                )}
+              </button>
+              <button
+                onClick={() => { setShowConnect(false); setSkLiveInput(''); }}
+                className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-400 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {connectMutation.isSuccess && (
+              <div className="p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
+                <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
+                {connectMutation.data?.data?.data?.message || 'Karma account connected!'}
+              </div>
+            )}
+
+            {connectMutation.isError && (
+              <p className="text-sm text-red-400">
+                {(connectMutation.error as any)?.response?.data?.error?.message || 'Invalid key or connection failed.'}
+              </p>
+            )}
           </div>
         )}
       </div>
