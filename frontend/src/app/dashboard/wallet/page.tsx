@@ -314,96 +314,49 @@ function KycPendingView({
   kycCheckMutation: any;
   connectMutation: any;
 }) {
-  const [showConnect, setShowConnect] = useState(false);
   const [skLiveInput, setSkLiveInput] = useState('');
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">Wallet</h1>
-        <p className="text-sm text-gray-500 mt-1">Complete verification to start spending</p>
+        <p className="text-sm text-gray-500 mt-1">Connect your Karma Card to start shopping</p>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center max-w-lg mx-auto">
-        <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-5">
-          <Shield className="h-8 w-8 text-yellow-400" />
-        </div>
-        <h2 className="text-lg font-bold text-white">Verification Pending</h2>
-        <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-sm mx-auto">
-          {kycStatus === 'rejected'
-            ? 'Your verification was rejected. Please complete KYC again on the Karma dashboard.'
-            : 'Your Karma account is connected but identity verification is not yet complete. Finish your KYC on the Karma dashboard to activate your card.'}
-        </p>
-
-        <div className="mt-8 flex flex-col items-center gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+        {/* Left: Create / Open Karma Account */}
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-brand-500/10 flex items-center justify-center mb-4">
+            <Wallet className="h-7 w-7 text-brand-400" />
+          </div>
+          <h2 className="text-base font-bold text-white">Create Karma Account</h2>
+          <p className="text-sm text-gray-400 mt-2 leading-relaxed flex-1">
+            Sign up, verify your identity and create a virtual card — all on Karma.
+          </p>
           <a
             href="https://agents.karmapay.xyz/dashboard"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors"
+            className="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors"
           >
             <ExternalLink className="h-4 w-4" />
-            {kycStatus === 'rejected' ? 'Retry on Karma' : 'Complete Verification on Karma'}
+            Open Karma
           </a>
-
-          <button
-            onClick={() => kycCheckMutation.mutate()}
-            disabled={kycCheckMutation.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            {kycCheckMutation.isPending ? (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...</>
-            ) : (
-              <><RefreshCw className="h-3.5 w-3.5" /> Check verification status</>
-            )}
-          </button>
         </div>
 
-        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus === 'approved' && (
-          <div className="mt-4 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
-            <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
-            Verified! Your card has been created.
-          </div>
-        )}
-
-        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus && kycCheckMutation.data.data.data.kycStatus !== 'approved' && (
-          <div className="mt-4 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm">
-            <AlertCircle className="h-4 w-4 inline mr-1.5" />
-            Status: {kycCheckMutation.data.data.data.kycStatus}. Complete verification on Karma to continue.
-          </div>
-        )}
-      </div>
-
-      {/* Connect a different Karma account */}
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 max-w-lg mx-auto">
-        {!showConnect ? (
-          <button
-            onClick={() => setShowConnect(true)}
-            className="w-full flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <Link2 className="h-5 w-5 text-emerald-400" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-medium text-white">Connect a different Karma account</p>
-                <p className="text-[11px] text-gray-500">Already have a verified account? Switch to it</p>
-              </div>
+        {/* Right: Connect Existing Karma Account */}
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 flex flex-col">
+          <div className="flex flex-col items-center text-center mb-4">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4">
+              <Link2 className="h-7 w-7 text-emerald-400" />
             </div>
-            <ExternalLink className="h-4 w-4 text-gray-600 group-hover:text-gray-400 transition-colors" />
-          </button>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <Link2 className="h-5 w-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">Connect Existing Account</p>
-                <p className="text-[11px] text-gray-500">Paste your Karma owner key</p>
-              </div>
-            </div>
+            <h2 className="text-base font-bold text-white">Connect Karma Account</h2>
+            <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+              Already have a Karma account? Paste your owner key to connect it.
+            </p>
+          </div>
 
+          <div className="mt-auto space-y-3">
             <div>
               <input
                 type="password"
@@ -420,41 +373,69 @@ function KycPendingView({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
-                disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-60"
-              >
-                {connectMutation.isPending ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Connecting...</>
-                ) : (
-                  <><Link2 className="h-3.5 w-3.5" /> Connect</>
-                )}
-              </button>
-              <button
-                onClick={() => { setShowConnect(false); setSkLiveInput(''); }}
-                className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+            <button
+              onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
+              disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+            >
+              {connectMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Connecting...</>
+              ) : (
+                <><Link2 className="h-4 w-4" /> Connect Account</>
+              )}
+            </button>
 
             {connectMutation.isSuccess && (
-              <div className="p-3 rounded-lg bg-green-500/10 text-green-400 text-sm">
+              <div className="p-3 rounded-lg bg-green-500/10 text-green-400 text-sm text-center">
                 <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
                 {connectMutation.data?.data?.data?.message || 'Karma account connected!'}
               </div>
             )}
 
             {connectMutation.isError && (
-              <p className="text-sm text-red-400">
+              <p className="text-sm text-red-400 text-center">
                 {(connectMutation.error as any)?.response?.data?.error?.message || 'Invalid key or connection failed.'}
               </p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Check verification status (for users who already connected but KYC pending) */}
+      <div className="text-center">
+        <button
+          onClick={() => kycCheckMutation.mutate()}
+          disabled={kycCheckMutation.isPending}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          {kycCheckMutation.isPending ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...</>
+          ) : (
+            <><RefreshCw className="h-3.5 w-3.5" /> Check verification status</>
+          )}
+        </button>
+
+        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus === 'approved' && (
+          <div className="mt-3 p-3 rounded-lg bg-green-500/10 text-green-400 text-sm inline-block">
+            <CheckCircle2 className="h-4 w-4 inline mr-1.5" />
+            Verified! Your card has been created.
+          </div>
+        )}
+
+        {kycCheckMutation.isSuccess && kycCheckMutation.data?.data?.data?.kycStatus && kycCheckMutation.data.data.data.kycStatus !== 'approved' && (
+          <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 text-yellow-400 text-sm inline-block">
+            <AlertCircle className="h-4 w-4 inline mr-1.5" />
+            Status: {kycCheckMutation.data.data.data.kycStatus}. Complete verification on Karma to continue.
+          </div>
         )}
       </div>
+
+      <p className="text-[11px] text-gray-600 text-center">
+        Powered by{' '}
+        <a href="https://agents.karmapay.xyz" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-400">
+          Karma Agent Card
+        </a>
+      </p>
     </div>
   );
 }
