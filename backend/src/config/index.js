@@ -58,6 +58,10 @@ const config = {
     captchaSolverKey: process.env.CAPTCHA_SOLVER_KEY || '', // 2Captcha API key
     mockCheckout: process.env.MOCK_CHECKOUT === 'true', // Force mock mode for testing (skips real payment + browser)
     dryRunCheckout: process.env.DRY_RUN_CHECKOUT === 'true', // Run real browser checkout but STOP before final submit (no real payment)
+    // Browser Use Agent (Python sidecar)
+    useBrowserUse: process.env.USE_BROWSER_USE !== 'false', // default true — use browser-use agent instead of Anthropic Computer Use
+    agentUrl: process.env.CHECKOUT_AGENT_URL || 'http://localhost:8100',
+    agentTimeoutMs: parseInt(process.env.CHECKOUT_AGENT_TIMEOUT, 10) || 300000, // 5 minutes
   },
 };
 

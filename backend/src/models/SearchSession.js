@@ -56,3 +56,4 @@ const searchSessionSchema = new mongoose.Schema(
 module.exports = mongoose.model('SearchSession', searchSessionSchema);
 
 
+

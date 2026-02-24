@@ -19,7 +19,7 @@ const startServer = async () => {
     // Start Express server
     const port = process.env.PORT || config.port;
     app.listen(port, '0.0.0.0', () => {
-      logger.info(`Swiftbuy API server running on port ${port}`);
+      logger.info(`ClawCart API server running on port ${port}`);
       logger.info(`Environment: ${config.env}`);
       logger.info(`Health check: http://localhost:${port}/health`);
     });

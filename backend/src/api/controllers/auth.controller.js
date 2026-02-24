@@ -84,22 +84,28 @@ const registerAgent = async (req, res, next) => {
   try {
     const { agentName, permissions } = req.body;
 
+    // The agent is bound to the authenticated user
+    const userId = req.user._id.toString();
+
     const agentId = generateId('agent');
     const apiKey = generateId('sk');
 
     // Hash the API key for storage
     const apiKeyHash = await bcrypt.hash(apiKey, 10);
 
+    const effectivePermissions = permissions || ['search', 'purchase', 'wallet_read'];
+
     await AgentSession.create({
       agentId,
       agentName,
       apiKeyHash,
-      permissions: permissions || ['search', 'purchase', 'wallet_read'],
+      userId,
+      permissions: effectivePermissions,
     });
 
-    // Generate agent JWT
+    // Generate agent JWT — includes userId so /me can resolve the user
     const token = jwt.sign(
-      { agentId, agentName, permissions },
+      { agentId, agentName, userId, permissions: effectivePermissions },
       config.jwt.agentSecret,
       { expiresIn: '365d' }
     );
@@ -109,10 +115,11 @@ const registerAgent = async (req, res, next) => {
       data: {
         agentId,
         agentName,
+        userId,
         apiKey, // Only shown once
         token,
-        permissions,
-        message: 'Save your API key — it will not be shown again',
+        permissions: effectivePermissions,
+        message: 'Save your API key and token — they will not be shown again. Use the token as Bearer auth for all agent API calls.',
       },
     });
   } catch (error) {
@@ -135,6 +142,7 @@ const getProfile = async (req, res, next) => {
 };
 
 module.exports = { register, login, registerAgent, getProfile };
+
 
 
 

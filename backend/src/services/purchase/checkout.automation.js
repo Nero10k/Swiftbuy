@@ -2,29 +2,26 @@ const { chromium } = require('playwright');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const CheckoutFlow = require('../../models/CheckoutFlow');
 const fastCheckout = require('./fast-checkout');
+const browserUseClient = require('./browseruse-client');
 const config = require('../../config');
 const logger = require('../../utils/logger');
 const { sleep, generateId } = require('../../utils/helpers');
 
 /**
- * Checkout Automation Engine — Anthropic Computer Use
+ * Checkout Automation Engine
  *
- * Uses Claude's Computer Use API to control a Playwright browser with
- * coordinate-based actions. Claude sees screenshots and clicks/types
- * at exact pixel positions — no CSS selectors needed.
+ * Two engines available:
+ *   1. Browser Use Agent (PRIMARY) — Python FastAPI + browser-use library
+ *      - Cheaper, faster, learns checkout flows
+ *      - Requires the Python sidecar running on port 8100
+ *   2. Anthropic Computer Use (FALLBACK) — Claude vision + Playwright
+ *      - More expensive, slower, but no external dependency
+ *      - Direct screenshot→action loop
  *
- * Flow:
- *   1. Launch headless Playwright browser
- *   2. Navigate to product URL
- *   3. Start Computer Use conversation with Claude
- *   4. Claude calls `computer` tool (screenshot, left_click, type, etc.)
- *   5. We execute the action with Playwright and return a screenshot
- *   6. Repeat until order is confirmed or max turns reached
- *
- * Checkout Memory:
- *   - First checkout on a domain: Computer Use guided (~8 turns, ~$0.10)
- *   - Subsequent checkouts: replay saved coordinate flow ($0.00)
- *   - If saved step fails: fall back to Computer Use for remaining steps
+ * The engine auto-selects:
+ *   - If Python agent is running → Browser Use (learn once, replay forever)
+ *   - If not → Anthropic Computer Use (coordinate-based)
+ *   - If neither → mock/error
  */
 
 const VIEWPORT = { width: 1366, height: 768 };
@@ -60,10 +57,6 @@ class CheckoutAutomation {
    * @returns {{ success, retailerOrderId, confirmationUrl, executionMs, llmCalls, usedSavedFlow }}
    */
   async executeCheckout(order, cardDetails, shippingAddress, user, options = {}) {
-    if (!this.anthropic) {
-      throw new Error('Checkout engine not configured: ANTHROPIC_API_KEY is missing');
-    }
-
     const productUrl = order.product.url;
     if (!productUrl) {
       throw new Error('Product URL is required for automated checkout');
@@ -74,7 +67,59 @@ class CheckoutAutomation {
     const startTime = Date.now();
     const checkoutId = generateId('chk');
 
-    logger.info(`[${checkoutId}] Starting ${dryRun ? '🧪 DRY-RUN ' : ''}checkout on ${domain} for order ${order.orderId}`);
+    // ═══════════════════════════════════════════════════════════════
+    // TRY BROWSER USE AGENT FIRST (Primary — cheaper, faster, learns)
+    // ═══════════════════════════════════════════════════════════════
+    const browserUseAvailable = await this._isBrowserUseAvailable();
+    
+    if (browserUseAvailable) {
+      logger.info(`[${checkoutId}] 🚀 Using Browser Use agent for ${domain} (order: ${order.orderId})`);
+      try {
+        const result = await browserUseClient.executeCheckout(
+          order,
+          cardDetails,
+          shippingAddress,
+          user,
+          { dryRun, headless: config.checkout.headless }
+        );
+        
+        logger.info(`[${checkoutId}] Browser Use result:`, {
+          success: result.success,
+          executionMs: result.executionMs,
+          llmCalls: result.llmCalls,
+          usedSavedFlow: result.usedSavedFlow,
+          error: result.error,
+        });
+
+        if (result.success) {
+          return result;
+        }
+        
+        // If Browser Use failed, decide whether to fall back
+        if (this.anthropic) {
+          logger.warn(`[${checkoutId}] Browser Use failed (${result.error}), falling back to Anthropic Computer Use`);
+          // Fall through to the old engine below
+        } else {
+          // No fallback available — return the Browser Use result as-is
+          return result;
+        }
+      } catch (buError) {
+        if (this.anthropic) {
+          logger.warn(`[${checkoutId}] Browser Use error (${buError.message}), falling back to Anthropic Computer Use`);
+        } else {
+          throw buError;
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FALLBACK: ANTHROPIC COMPUTER USE (Legacy — more expensive)
+    // ═══════════════════════════════════════════════════════════════
+    if (!this.anthropic) {
+      throw new Error('No checkout engine available: Browser Use agent is not running and ANTHROPIC_API_KEY is missing');
+    }
+
+    logger.info(`[${checkoutId}] Starting ${dryRun ? '🧪 DRY-RUN ' : ''}Anthropic Computer Use checkout on ${domain} for order ${order.orderId}`);
 
     // ── Smart country resolution ──────────────────────────────────
     // If "state" field contains a country name (e.g. "Netherlands") and
@@ -368,7 +413,21 @@ class CheckoutAutomation {
   }
 
   isReady() {
-    return !!this.anthropic;
+    // Ready if either engine is available
+    return !!this.anthropic || config.checkout.useBrowserUse;
+  }
+
+  /**
+   * Check if the Browser Use Python agent is running
+   * @returns {Promise<boolean>}
+   */
+  async _isBrowserUseAvailable() {
+    if (!config.checkout.useBrowserUse) return false;
+    try {
+      return await browserUseClient.isReady();
+    } catch {
+      return false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════

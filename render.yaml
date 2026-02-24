@@ -1,0 +1,75 @@
+# ClawCart — Render Blueprint
+# Deploy: https://render.com/deploy?repo=https://github.com/Nero10k/Swiftbuy
+#
+# Two services:
+#   1. clawcart-api        — Node.js backend (port 3000)
+#   2. clawcart-checkout   — Python checkout agent (port 8100)
+#
+# External dependencies (set in env vars):
+#   - MongoDB Atlas (MONGODB_URI)
+#   - Redis — Upstash or Render Redis (REDIS_HOST, REDIS_PORT, REDIS_PASSWORD)
+
+services:
+  # ── Node.js API Backend ──────────────────────────────────────
+  - type: web
+    name: clawcart-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # MongoDB Atlas
+      - key: MONGODB_URI
+        sync: false
+      # Redis
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"
+      - key: REDIS_PASSWORD
+        sync: false
+      # JWT — generate real secrets!
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_AGENT_SECRET
+        generateValue: true
+      # Checkout agent URL — points to the Python service
+      - key: CHECKOUT_AGENT_URL
+        fromService:
+          name: clawcart-checkout
+          type: web
+          property: hostport
+      # API Keys
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BROWSER_USE_API_KEY
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      # Checkout mode
+      - key: MOCK_CHECKOUT
+        value: "false"
+      - key: DRY_RUN_CHECKOUT
+        value: "true"
+
+  # ── Python Checkout Agent ────────────────────────────────────
+  - type: web
+    name: clawcart-checkout
+    runtime: docker
+    dockerfilePath: ./backend/checkout-agent/Dockerfile
+    dockerContext: ./backend/checkout-agent
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BROWSER_USE_API_KEY
+        sync: false
+      - key: PORT
+        value: "8100"
+
