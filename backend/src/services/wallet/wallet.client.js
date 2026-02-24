@@ -359,12 +359,23 @@ class KarmaWalletClient {
    * @returns {{ connected: boolean, ready: boolean, status: string }}
    */
   checkStatus(user) {
-    if (!user.karma || !user.karma.skLive) {
+    // Connected if we have either an owner key or an agent key
+    if (!user.karma || (!user.karma.skLive && !user.karma.skAgent)) {
       return { connected: false, ready: false, status: 'not_connected' };
     }
 
     if (user.karma.kycStatus !== 'approved') {
       return { connected: true, ready: false, status: `kyc_${user.karma.kycStatus}` };
+    }
+
+    // If we have an agent key directly (no owner key), we're ready
+    // (agent key means card exists and KYC is approved)
+    if (user.karma.skAgent && !user.karma.cardId) {
+      // Agent-key-only connection — skip cardId check
+      if (user.karma.cardFrozen) {
+        return { connected: true, ready: false, status: 'card_frozen' };
+      }
+      return { connected: true, ready: true, status: 'ready' };
     }
 
     if (!user.karma.cardId) {

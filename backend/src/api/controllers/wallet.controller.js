@@ -5,25 +5,81 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 /**
- * Connect an existing Karma account — user already has sk_live key
+ * Connect an existing Karma account — accepts either owner key (sk_live_) or agent key (sk_agent_)
  * POST /api/v1/wallet/connect
  */
 const connectExisting = async (req, res, next) => {
   try {
-    const { skLive } = req.body;
+    const { skLive, karmaKey } = req.body;
+    const key = karmaKey || skLive; // Support both field names
 
-    if (!skLive || !skLive.startsWith('sk_live_')) {
+    if (!key || (!key.startsWith('sk_live_') && !key.startsWith('sk_agent_'))) {
       throw new AppError(
-        'A valid Karma owner key (sk_live_...) is required.',
+        'A valid Karma key (sk_live_... or sk_agent_...) is required.',
         400,
         'VALIDATION_ERROR'
       );
     }
 
     const user = await User.findById(req.user._id);
+    const isAgentKey = key.startsWith('sk_agent_');
+
+    // ─── Agent key flow: verify by checking balance + card details ───
+    if (isAgentKey) {
+      // Check if already connected with this agent key
+      if (user.karma?.skAgent === key) {
+        const status = karmaClient.checkStatus(user);
+        return res.json({
+          success: true,
+          data: {
+            alreadyConnected: true,
+            ...status,
+            message: 'This Karma card is already connected.',
+          },
+        });
+      }
+
+      logger.info(`Connecting Karma card via agent key for user ${user._id}`);
+
+      // Verify the key works by checking balance
+      const balance = await karmaClient.getBalance(key);
+
+      // Get card details (last4, expiry, etc.)
+      const cardDetails = await karmaClient.getCardDetails(key);
+      const last4 = cardDetails.number ? cardDetails.number.slice(-4) : '????';
+
+      // Save directly — agent key is all we need for spending
+      user.karma = {
+        ...user.karma,
+        skAgent: key,
+        kycStatus: 'approved', // If agent key works, KYC must be approved
+        depositAddress: balance.depositAddress,
+        cardLast4: last4,
+        cardFrozen: false,
+      };
+      user.walletAddress = balance.depositAddress;
+
+      await user.save();
+
+      const status = karmaClient.checkStatus(user);
+
+      return res.json({
+        success: true,
+        data: {
+          ...status,
+          kycStatus: 'approved',
+          cardLast4: last4,
+          depositAddress: balance.depositAddress,
+          balance: balance.available,
+          message: `Karma card ****${last4} connected! Balance: ${balance.available} USDC.`,
+        },
+      });
+    }
+
+    // ─── Owner key flow (existing logic) ───
 
     // If already connected with this key, tell them
-    if (user.karma?.skLive === skLive) {
+    if (user.karma?.skLive === key) {
       const status = karmaClient.checkStatus(user);
       return res.json({
         success: true,
@@ -38,19 +94,19 @@ const connectExisting = async (req, res, next) => {
     logger.info(`Connecting existing Karma account for user ${user._id}`);
 
     // 1. Verify the key works by checking KYC status
-    const { status: kycStatus } = await karmaClient.getKycStatus(skLive);
+    const { status: kycStatus } = await karmaClient.getKycStatus(key);
 
     // 2. Save owner key + KYC status
     user.karma = {
       ...user.karma,
-      skLive,
+      skLive: key,
       kycStatus: kycStatus || 'none',
     };
 
     // 3. If KYC is approved, try to pull in existing cards
     if (kycStatus === 'approved') {
       try {
-        const cards = await karmaClient.listCards(skLive);
+        const cards = await karmaClient.listCards(key);
         const cardList = cards.cards || cards || [];
 
         if (cardList.length > 0) {
@@ -68,7 +124,7 @@ const connectExisting = async (req, res, next) => {
           logger.info(`Imported existing Karma card ****${card.last4} for user ${user._id}`);
         } else {
           // KYC approved but no card yet — create one for Swiftbuy
-          const newCard = await karmaClient.createCard(skLive, {
+          const newCard = await karmaClient.createCard(key, {
             name: `Swiftbuy - ${user.name}`,
             perTxnLimit: 500,
             dailyLimit: 1000,

@@ -48,9 +48,9 @@ export default function WalletPage() {
     enabled: statusData?.ready === true,
   });
 
-  // Connect existing Karma account
+  // Connect existing Karma account (accepts sk_live_ or sk_agent_ keys)
   const connectMutation = useMutation({
-    mutationFn: (skLive: string) => walletApi.connectExisting(skLive),
+    mutationFn: (karmaKey: string) => walletApi.connectExisting(karmaKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet-status'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
@@ -312,7 +312,8 @@ function KycPendingView({
   kycCheckMutation: any;
   connectMutation: any;
 }) {
-  const [skLiveInput, setSkLiveInput] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+  const isValidKey = keyInput.startsWith('sk_live_') || keyInput.startsWith('sk_agent_');
 
   return (
     <div className="space-y-6">
@@ -350,7 +351,7 @@ function KycPendingView({
             </div>
             <h2 className="text-base font-bold text-white">Connect Karma Account</h2>
             <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-              Already have a Karma account? Paste your owner key to connect it.
+              Already have a Karma account? Paste your key to connect it.
             </p>
           </div>
 
@@ -358,9 +359,9 @@ function KycPendingView({
             <div>
               <input
                 type="password"
-                value={skLiveInput}
-                onChange={(e) => setSkLiveInput(e.target.value)}
-                placeholder="sk_live_..."
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder="sk_live_... or sk_agent_..."
                 className="w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50"
               />
               <p className="text-[10px] text-gray-600 mt-1.5">
@@ -372,8 +373,8 @@ function KycPendingView({
             </div>
 
             <button
-              onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
-              disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
+              onClick={() => keyInput.trim() && connectMutation.mutate(keyInput.trim())}
+              disabled={connectMutation.isPending || !isValidKey}
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
             >
               {connectMutation.isPending ? (
@@ -417,7 +418,9 @@ function ConnectView({
   connectMutation: any;
 }) {
   const [showConnect, setShowConnect] = useState(false);
-  const [skLiveInput, setSkLiveInput] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+
+  const isValidKey = keyInput.startsWith('sk_live_') || keyInput.startsWith('sk_agent_');
 
   return (
     <div className="space-y-6">
@@ -455,8 +458,8 @@ function ConnectView({
               <div className="flex items-start gap-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold bg-brand-500/20 text-brand-400">2</div>
                 <div>
-                  <p className="text-sm font-medium text-white">Get your owner key</p>
-                  <p className="text-[11px] text-gray-500">Copy your <code className="text-[10px] bg-white/5 px-1 py-0.5 rounded">sk_live_...</code> key from the Karma dashboard</p>
+                  <p className="text-sm font-medium text-white">Get your Karma key</p>
+                  <p className="text-[11px] text-gray-500">Copy your <code className="text-[10px] bg-white/5 px-1 py-0.5 rounded">sk_live_...</code> or <code className="text-[10px] bg-white/5 px-1 py-0.5 rounded">sk_agent_...</code> key from the Karma dashboard</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -493,13 +496,13 @@ function ConnectView({
             {/* Connect form */}
             <div className="mt-6 max-w-sm mx-auto">
               <label className="block text-left text-xs text-gray-400 font-medium mb-1.5">
-                Karma Owner Key
+                Karma Key
               </label>
               <input
                 type="password"
-                value={skLiveInput}
-                onChange={(e) => setSkLiveInput(e.target.value)}
-                placeholder="sk_live_..."
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder="sk_live_... or sk_agent_..."
                 className="w-full px-3 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-brand-500/50"
               />
               <p className="text-[10px] text-gray-600 mt-1.5 text-left">
@@ -513,8 +516,8 @@ function ConnectView({
 
             <div className="mt-6 flex flex-col items-center gap-3">
               <button
-                onClick={() => skLiveInput.trim() && connectMutation.mutate(skLiveInput.trim())}
-                disabled={connectMutation.isPending || !skLiveInput.startsWith('sk_live_')}
+                onClick={() => keyInput.trim() && connectMutation.mutate(keyInput.trim())}
+                disabled={connectMutation.isPending || !isValidKey}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
               >
                 {connectMutation.isPending ? (
@@ -525,7 +528,7 @@ function ConnectView({
               </button>
 
               <button
-                onClick={() => { setShowConnect(false); setSkLiveInput(''); }}
+                onClick={() => { setShowConnect(false); setKeyInput(''); }}
                 className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
               >
                 ← Back
