@@ -57,7 +57,7 @@ class GoogleShoppingScraper extends BaseScraper {
    * @param {number} limit - Max results
    * @param {Object} geo - { gl, hl, currency, currencySymbol } for country-aware search
    */
-  async search(query, filters = {}, limit = 10, geo = null) {
+  async search(query, filters = {}, limit = 10, geo = null, resolveUrls = false) {
     if (!this.apiKey) {
       logger.warn('Google Shopping: SERPER_API_KEY not set. Get free key at https://serper.dev');
       throw new Error('SERPER_API_KEY not configured');
@@ -119,13 +119,15 @@ class GoogleShoppingScraper extends BaseScraper {
         return scoreB - scoreA;
       });
 
-      // Resolve Google redirect URLs → actual retailer URLs (for checkout engine)
-      // Request extra candidates so we still have enough after filtering blocked retailers
+      // Optionally resolve Google redirect URLs → actual retailer URLs.
+      // Skip during chat searches (viewUrls point to our frontend, not the retailer directly).
+      // Only resolve when resolveUrls=true (e.g. right before checkout).
       const candidates = products.slice(0, limit * 3);
-      await this._resolveProductUrls(candidates);
+      if (resolveUrls) {
+        await this._resolveProductUrls(candidates);
+      }
 
       // Filter out retailers that require an account (guest checkout not supported).
-      // Must happen AFTER URL resolution — some Dutch shop listings resolve to amazon.nl/ebay.com.
       const beforeBlock = candidates.length;
       const filtered = candidates.filter((p) => !this._isBlockedRetailer(p.retailer, p.url));
       if (filtered.length < beforeBlock) {

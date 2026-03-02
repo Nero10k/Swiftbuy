@@ -70,7 +70,7 @@ class ScraperManager {
    * @param {string} intent - Query intent (product, flight, hotel, tickets, food)
    * @param {Object} geo - { gl, hl, currency, currencySymbol, name } country-aware params
    */
-  async searchAll(query, filters = {}, limit = 10, intent = 'product', geo = null) {
+  async searchAll(query, filters = {}, limit = 10, intent = 'product', geo = null, resolveUrls = false) {
     logger.info(`🔍 Universal search for "${query}" | intent: ${intent} | geo: ${geo?.gl || 'us'} | limit: ${limit}`);
 
     // Route to the correct search provider based on intent
@@ -82,16 +82,16 @@ class ScraperManager {
       case 'tickets':
       case 'food':
       case 'subscription':
-        return this._searchGeneral(query, filters, limit, intent, geo);
+        return this._searchGeneral(query, filters, limit, intent, geo, resolveUrls);
       default:
-        return this._searchProducts(query, filters, limit, geo);
+        return this._searchProducts(query, filters, limit, geo, resolveUrls);
     }
   }
 
   /**
    * Search for PRODUCTS (Google Shopping → Amazon fallback)
    */
-  async _searchProducts(query, filters, limit, geo = null) {
+  async _searchProducts(query, filters, limit, geo = null, resolveUrls = false) {
     const results = {
       products: [],
       sources: [],
@@ -102,7 +102,7 @@ class ScraperManager {
     if (googleShoppingScraper.isAvailable()) {
       try {
         logger.info(`Phase 1: Searching Google Shopping API (geo: ${geo?.gl || 'us'})...`);
-        const googleResults = await googleShoppingScraper.search(query, filters, limit, geo);
+        const googleResults = await googleShoppingScraper.search(query, filters, limit, geo, resolveUrls);
 
         if (googleResults.length > 0) {
           results.products.push(...googleResults);
@@ -213,13 +213,13 @@ class ScraperManager {
   /**
    * Search for TICKETS, FOOD, or other services
    */
-  async _searchGeneral(query, filters, limit, intent, geo = null) {
+  async _searchGeneral(query, filters, limit, intent, geo = null, resolveUrls = false) {
     // First try Google Shopping (some tickets are sold there)
     let results = [];
 
     if (googleShoppingScraper.isAvailable()) {
       try {
-        results = await googleShoppingScraper.search(query, filters, limit, geo);
+        results = await googleShoppingScraper.search(query, filters, limit, geo, resolveUrls);
       } catch (e) {
         logger.warn(`Shopping search failed for ${intent}: ${e.message}`);
       }
