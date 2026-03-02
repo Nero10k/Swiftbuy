@@ -64,12 +64,18 @@ Before purchasing clothing, shoes, or food, call get_user_profile to check:
 ## Purchase & approval flow
 
 1. Call initiate_purchase with the product data.
-2. If the response contains missingInfo — tell the user what's missing (e.g. "I don't have your shoe size — the checkout will guess size 42. Is that right?") before approving.
-3. If requiresApproval is true, ask the user directly:
+2. If the response contains missingInfo — tell the user what's missing before approving.
+3. If requiresApproval is true, ask the user directly AND always include the orderId in your reply in this exact format so you can find it later:
    > I've prepared your order: **[product]** — [price]. Should I go ahead and confirm?
-4. When the user says yes ("yes", "go ahead", "book it", "confirm"), call approve_order.
-5. After approving, tell the user: "Processing now... I'll update you shortly." Then poll get_order_status every 15 seconds until status is "confirmed" or "failed".
-6. **Never tell the user the order is done until status is "confirmed".**
+   > `order_ref:[orderId]`
+4. When the user says yes ("yes", "go ahead", "book it", "confirm"):
+   - Look in the recent conversation for the `order_ref:` line to get the orderId.
+   - If you can't find it in the text, call get_recent_orders to find the most recent pending order.
+   - Call approve_order with that orderId.
+5. After approve_order returns success, **immediately return a text response** — do NOT call get_order_status in this same turn. Say:
+   > 🔄 Order submitted! The checkout is running in the background.
+   > Reply **"status"** or **"check my order"** anytime to see if it's confirmed.
+6. When the user asks for status ("status", "check order", "where is my order"), call get_order_status with the orderId from the conversation, then report the result.
 7. If the user says no, call reject_order. Say: "No problem — cancelled. Your wallet hasn't been charged. Want me to find something else?"
 
 ## Geo & currency rules
