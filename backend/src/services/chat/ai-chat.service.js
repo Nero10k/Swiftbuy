@@ -33,7 +33,7 @@ const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-haiku-4-5-20251001';
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 // Keep this focused on behaviour; the tools define the capabilities.
-const SYSTEM_PROMPT = `You are the Swiftbuy shopping assistant, embedded directly in the user's dashboard.
+const BASE_SYSTEM_PROMPT = `You are the Swiftbuy shopping assistant, embedded directly in the user's dashboard.
 You can search for products, look up a specific product by URL, start a purchase, approve orders, and check order status.
 All of these capabilities are available as tools — use them instead of making up prices or product details.
 
@@ -44,7 +44,20 @@ Rules:
 - For clothing and shoes: check if the user has saved sizes before purchasing. If not, ask.
 - Keep replies concise and friendly. Use markdown (bold, bullet points) — it renders correctly in the UI.
 - When presenting search results, show 2-3 options maximum with name, price, retailer, and the viewUrl as a markdown link.
-- Do not mention "tools", "API calls", or internal system names to the user.`;
+- Do not mention "tools", "API calls", or internal system names to the user.
+
+Geo & currency rules:
+- The user's country and currency are injected below. ALWAYS use that currency symbol when displaying prices — never assume USD.
+- When calling search_products, include the country/region in the query to get local results (e.g. "children's book Netherlands" not just "children's book").
+- Results come from local retailers for the user's country. Present them as-is — do not convert currencies.
+- Retailers that require an account (Amazon, bol.com, Zalando, AliExpress, eBay) cannot be checked out automatically. Skip them in favour of the next option if they appear in results.`;
+
+function buildSystemPrompt(geo) {
+  const countryLine = geo
+    ? `\nUser's location: ${geo.name} — always show prices in ${geo.currencySymbol} (${geo.currency}).`
+    : '';
+  return BASE_SYSTEM_PROMPT + countryLine;
+}
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 const TOOLS = [
@@ -158,7 +171,13 @@ async function executeTool(toolName, toolInput, userId) {
       if (toolInput.min_price) filters.min_price = toolInput.min_price;
 
       const limit = toolInput.limit || 5;
-      const results = await searchService.search(toolInput.query, filters, limit, {}, geo);
+      // Append country to the query when Claude hasn't already included it,
+      // so the underlying search engine surfaces local retailers.
+      const queryLower = toolInput.query.toLowerCase();
+      const countryHint = geo.name.toLowerCase();
+      const needsHint = !queryLower.includes(countryHint) && userCountry !== 'US';
+      const effectiveQuery = needsHint ? `${toolInput.query} ${geo.name}` : toolInput.query;
+      const results = await searchService.search(effectiveQuery, filters, limit, {}, geo);
 
       // Save search session for viewUrl links
       const frontendUrl = process.env.FRONTEND_URL || 'https://swiftbuy-app.vercel.app';
@@ -394,6 +413,11 @@ class AiChatService {
     const user = await User.findById(userId).lean();
     if (!user) throw new Error('User not found');
 
+    // Resolve geo once per request so the system prompt is country-aware
+    const userCountry = getUserCountry(user.shippingAddresses);
+    const geo = getGeoForCountry(userCountry);
+    const systemPrompt = buildSystemPrompt(geo);
+
     // Save user message
     await ChatMessage.create({ userId, conversationId, role: 'user', content: userMessage });
 
@@ -412,7 +436,7 @@ class AiChatService {
       const response = await client.messages.create({
         model: CHAT_MODEL,
         max_tokens: 2048,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         tools: TOOLS,
         messages: loopMessages,
       });
