@@ -264,44 +264,168 @@ function MessageBubble({ message, user, onSuggestionClick }: { message: ChatMess
   );
 }
 
-function FormattedContent({ content, isUser }: { content: string; isUser: boolean }) {
-  const paragraphs = content.split('\n\n');
-  return (
-    <div className="space-y-3">
-      {paragraphs.map((para, pi) => (
-        <div key={pi}>
-          {para.split('\n').map((line, li) => (
-            <p key={li} className={li > 0 ? 'mt-1' : ''}>
-              {formatLine(line, isUser)}
-            </p>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
+// ─── Markdown renderer ────────────────────────────────────────────────────────
 
-function formatLine(text: string, isUser: boolean) {
-  if (text.startsWith('• ') || text.startsWith('- ')) {
-    return (
-      <span className="flex items-start gap-2">
-        <span className={cn('mt-1.5 h-1.5 w-1.5 rounded-full shrink-0', isUser ? 'bg-brand-300' : 'bg-brand-400')} />
-        <span>{formatInline(text.slice(2), isUser)}</span>
-      </span>
-    );
-  }
-  return formatInline(text, isUser);
-}
-
-function formatInline(text: string, isUser: boolean) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+/** Inline: bold, italic, markdown links */
+function formatInline(text: string, isUser: boolean): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]*\]\([^)]+\))/g);
   return (
     <>
       {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className={cn('font-semibold', !isUser && 'text-white')}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>;
+        if (part.startsWith('**') && part.endsWith('**'))
+          return <strong key={i} className={cn('font-semibold', !isUser && 'text-white')}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith('*') && part.endsWith('*'))
+          return <em key={i} className="italic">{part.slice(1, -1)}</em>;
+        const link = part.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
+        if (link) {
+          const isViewLink = link[1].toLowerCase().includes('view');
+          return isViewLink ? (
+            <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 mt-1 px-3 py-1 bg-brand-600/20 hover:bg-brand-600/40 border border-brand-500/30 hover:border-brand-400/60 text-brand-300 hover:text-brand-200 text-xs font-medium rounded-lg transition-all">
+              {link[1]} ↗
+            </a>
+          ) : (
+            <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer"
+              className="text-brand-400 hover:text-brand-300 underline underline-offset-2 transition-colors">
+              {link[1]}
+            </a>
+          );
+        }
         return <span key={i}>{part}</span>;
       })}
     </>
+  );
+}
+
+type Block =
+  | { type: 'paragraph'; lines: string[] }
+  | { type: 'bullet-list'; items: string[] }
+  | { type: 'numbered-list'; items: { num: string; lines: string[] }[] }
+  | { type: 'divider' };
+
+/** Parse flat lines into semantic blocks */
+function parseBlocks(content: string): Block[] {
+  const rawLines = content.split('\n');
+  const blocks: Block[] = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) { blocks.push({ type: 'divider' }); i++; continue; }
+
+    // Numbered list item: "1. …" or "1) …"
+    const numMatch = line.match(/^(\d+)[.)]\s+(.*)/);
+    if (numMatch) {
+      const items: { num: string; lines: string[] }[] = [];
+      while (i < rawLines.length) {
+        const m = rawLines[i].match(/^(\d+)[.)]\s+(.*)/);
+        if (m) {
+          // Collect continuation lines (indented or link-only lines)
+          const sub = [m[2]];
+          i++;
+          while (i < rawLines.length && rawLines[i] !== '' && !rawLines[i].match(/^\d+[.)]\s+/)) {
+            sub.push(rawLines[i]); i++;
+          }
+          items.push({ num: m[1], lines: sub });
+        } else break;
+      }
+      blocks.push({ type: 'numbered-list', items }); continue;
+    }
+
+    // Bullet list item
+    if (line.startsWith('• ') || line.startsWith('- ') || line.startsWith('* ')) {
+      const items: string[] = [];
+      while (i < rawLines.length) {
+        const l = rawLines[i];
+        if (l.startsWith('• ') || l.startsWith('- ') || l.startsWith('* ')) {
+          items.push(l.replace(/^[•\-*]\s+/, '')); i++;
+        } else break;
+      }
+      blocks.push({ type: 'bullet-list', items }); continue;
+    }
+
+    // Blank line → paragraph separator (skip)
+    if (line.trim() === '') { i++; continue; }
+
+    // Regular paragraph — collect until blank/list
+    const lines: string[] = [];
+    while (i < rawLines.length && rawLines[i].trim() !== '' && !rawLines[i].match(/^(\d+[.)]\s+|[•\-*]\s+|---)/)) {
+      lines.push(rawLines[i]); i++;
+    }
+    if (lines.length) blocks.push({ type: 'paragraph', lines });
+  }
+  return blocks;
+}
+
+function FormattedContent({ content, isUser }: { content: string; isUser: boolean }) {
+  const blocks = parseBlocks(content);
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, bi) => {
+        if (block.type === 'divider')
+          return <hr key={bi} className="border-white/[0.06]" />;
+
+        if (block.type === 'bullet-list')
+          return (
+            <ul key={bi} className="space-y-1.5">
+              {block.items.map((item, ii) => (
+                <li key={ii} className="flex items-start gap-2">
+                  <span className={cn('mt-1.5 h-1.5 w-1.5 rounded-full shrink-0', isUser ? 'bg-brand-300' : 'bg-brand-400')} />
+                  <span className="text-sm leading-relaxed">{formatInline(item, isUser)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+
+        if (block.type === 'numbered-list')
+          return (
+            <div key={bi} className="space-y-3">
+              {block.items.map((item, ii) => {
+                // Split sub-lines into text lines and link lines
+                const textLines = item.lines.filter(l => !l.match(/^\[.*\]\(.*\)$/));
+                const linkLines = item.lines.filter(l => l.match(/^\[.*\]\(.*\)$/));
+                return (
+                  <div key={ii} className={cn(
+                    'rounded-xl border p-3',
+                    isUser
+                      ? 'bg-brand-700/20 border-brand-500/20'
+                      : 'bg-white/[0.03] border-white/[0.07]'
+                  )}>
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-[10px] font-bold text-brand-400 bg-brand-600/20 rounded-md px-1.5 py-0.5 shrink-0 mt-0.5">
+                        {item.num}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {textLines.map((l, li) => (
+                          <p key={li} className={cn('text-sm leading-relaxed', li === 0 ? '' : 'mt-0.5 text-gray-400 text-xs')}>
+                            {formatInline(l, isUser)}
+                          </p>
+                        ))}
+                        {linkLines.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {linkLines.map((l, li) => <span key={li}>{formatInline(l, isUser)}</span>)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+
+        // Paragraph
+        return (
+          <div key={bi} className="space-y-1">
+            {block.lines.map((line, li) => (
+              <p key={li} className="text-sm leading-relaxed">{formatInline(line, isUser)}</p>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }
