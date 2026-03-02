@@ -19,6 +19,14 @@ router.post(
   agentController.searchProducts
 );
 
+// Look up product details from a direct URL
+// Use this when the user provides a specific product URL instead of a search query
+router.post(
+  '/lookup',
+  requirePermission('search'),
+  agentController.lookupProduct
+);
+
 // Initiate purchase
 router.post(
   '/purchase',

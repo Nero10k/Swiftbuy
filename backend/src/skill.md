@@ -22,20 +22,31 @@ Authorization: Bearer {{AGENT_TOKEN}}
 
 ## How a Purchase Works (End-to-End)
 
-Here is the full flow you follow for every purchase:
+There are two flows depending on whether the user gives you a search query or a specific URL.
 
+**Flow A — User describes what they want (search first):**
 ```
 0. First call: GET /agent/me → get your user_id
-1. User asks for something ("find me a flight to Amsterdam")
-2. You search via ClawCart → get results
-3. You present 2-3 best options to the user with prices
-4. User picks one (or asks to refine)
-5. You initiate the purchase → order created
-6. If approval needed → you ask the user "Should I go ahead?"
-7. User says yes → you approve the order
-8. Tell user "Processing now..." → wait 30 seconds
-9. Poll GET /orders/{orderId} every 15s until confirmed/failed
-10. Tell the user the final result
+1. User asks for something ("find me a children's book")
+2. POST /search → get results
+3. Present 2-3 best options with prices
+4. User picks one
+5. POST /purchase with the product data
+6. If approval needed → ask "Should I go ahead?"
+7. User says yes → POST /orders/{orderId}/approve
+8. Tell user "Processing now..." → poll every 15s until confirmed/failed
+```
+
+**Flow B — User gives you a specific product URL:**
+```
+0. First call: GET /agent/me → get your user_id
+1. User gives you a URL ("buy this: https://www.boekenkraam.nl/boek/...")
+2. POST /lookup with the URL → get title + price
+3. Confirm with user: "I found [title] for €[price] at [retailer], shall I order it?"
+4. POST /purchase with the product data from /lookup
+5. If approval needed → ask "Should I go ahead?"
+6. User says yes → POST /orders/{orderId}/approve
+7. Tell user "Processing now..." → poll every 15s until confirmed/failed
 ```
 
 **Everything happens in this conversation.** The user never needs to open a dashboard or click a link to approve.
@@ -114,7 +125,53 @@ If no phone number is on file (`profile.phone` is empty and no phone in shipping
 
 ---
 
-### 2. Search Products & Services
+### 2. Look Up Product by URL (USE WHEN USER GIVES YOU A LINK)
+
+When the user pastes a specific product URL, call this endpoint **instead of /search** to extract the title and price before purchasing.
+
+```
+POST /api/v1/agent/lookup
+```
+
+**Request body:**
+
+```json
+{
+  "url": "https://www.boekenkraam.nl/boek/9789464042474/overal-zijn-beestjes"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "product": {
+      "title": "Overal zijn beestjes",
+      "price": 14.99,
+      "retailer": "boekenkraam.nl",
+      "url": "https://www.boekenkraam.nl/boek/9789464042474/overal-zijn-beestjes",
+      "image": "https://..."
+    },
+    "priceFound": true,
+    "agentMessage": "Found 'Overal zijn beestjes' at boekenkraam.nl for €14.99.",
+    "agentInstructions": "Confirm with the user, then call /purchase with this product data."
+  }
+}
+```
+
+**After a successful lookup, confirm with the user:**
+
+> I found **Overal zijn beestjes** at boekenkraam.nl for €14.99. Shall I order it?
+
+**If `priceFound: false`:** The price couldn't be extracted automatically. Tell the user: "I found the product but couldn't read the price. What price do you see on the page?" Then use their answer in the `/purchase` call.
+
+**If the lookup fails:** Tell the user the link didn't work and offer to search for the product by name instead.
+
+---
+
+### 3. Search Products & Services
 
 Search across the entire web — products, flights, hotels, restaurants, event tickets, car rentals.
 
@@ -148,6 +205,8 @@ POST /api/v1/agent/search
 
 **The response includes `agentMessage`** — a pre-formatted summary you can relay to the user. It also includes `agentInstructions` for what to do next.
 
+**⚠️ Retailer compatibility:** ClawCart uses automated guest checkout. Retailers that require an account (Amazon, bol.com, Zalando, AliExpress, eBay) are automatically filtered from results. If you see one in results, skip it and present the next option instead.
+
 **🌍 Country-Aware Search:** Results are automatically localized based on the user's shipping address country. A user in Romania gets results from emag.ro, altex.ro, etc. in RON. A user in Netherlands gets results from bol.com, coolblue.nl, etc. in EUR. The response `meta.geo` tells you the currency used. **Always show prices in the local currency** from the response — never assume USD.
 
 **🔗 Product View Links:** Each product in the response includes a `viewUrl` link. **Always include this link** when presenting products so the user can click to see full details, images, and buy directly on ClawCart. Format it as a clickable link like `[View on ClawCart](viewUrl)`.
@@ -168,7 +227,7 @@ Always include: **name/title, price (in local currency), key detail** (for fligh
 
 ---
 
-### 3. Initiate Purchase
+### 4. Initiate Purchase
 
 Once the user picks something, create the order. **Pass the product data directly** from the search results.
 
@@ -211,7 +270,7 @@ POST /api/v1/agent/purchase
 
 ---
 
-### 4. Approve Order (In-Chat)
+### 5. Approve Order (In-Chat)
 
 When the user confirms ("yes", "go ahead", "book it", "confirm"), approve the order:
 
@@ -255,7 +314,7 @@ Example polling flow:
 
 ---
 
-### 5. Reject Order (In-Chat)
+### 6. Reject Order (In-Chat)
 
 If the user says no ("cancel", "nevermind", "don't buy it"), reject:
 
@@ -276,7 +335,7 @@ POST /api/v1/agent/orders/{{orderId}}/reject
 
 ---
 
-### 6. Check Order Status
+### 7. Check Order Status
 
 Track any previous order:
 
@@ -288,7 +347,7 @@ The response includes `agentMessage` — a human-friendly status update you can 
 
 ---
 
-### 7. Get User's Orders
+### 8. Get User's Orders
 
 See all recent orders:
 
@@ -298,7 +357,7 @@ GET /api/v1/agent/users/{{user_id}}/orders?limit=5
 
 ---
 
-### 8. Check Wallet Balance
+### 9. Check Wallet Balance
 
 ```
 GET /api/v1/agent/wallet/{{user_id}}/balance
@@ -400,6 +459,7 @@ All errors follow this format:
 | `NO_WALLET` | "You'll need to connect your Karma Agent Wallet first. Head to your ClawCart dashboard to set it up." |
 | `PRODUCT_NOT_FOUND` | "I couldn't find that product anymore — it may have sold out. Want me to search again?" |
 | `INVALID_ORDER_STATUS` | "That order can't be modified right now — it's already being processed." |
+| `CHECKOUT_FAILED` | "The checkout didn't complete on [retailer]. This can happen with sites that require an account (like Amazon or bol.com). Want me to find the same product on a different store?" |
 
 Never show error codes to the user. Translate them into helpful, plain language.
 
@@ -410,6 +470,7 @@ Never show error codes to the user. Translate them into helpful, plain language.
 | Action | Method | Endpoint |
 |---|---|---|
 | Get user profile | GET | `/users/{{user_id}}/profile` |
+| Look up product by URL | POST | `/lookup` |
 | Search | POST | `/search` |
 | Initiate purchase | POST | `/purchase` |
 | Approve order | POST | `/orders/{{orderId}}/approve` |

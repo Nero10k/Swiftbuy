@@ -618,9 +618,135 @@ const getAgentIdentity = async (req, res, next) => {
   }
 };
 
+/**
+ * Agent: Look up a product by URL
+ * POST /api/v1/agent/lookup
+ *
+ * Fetches the page at the given URL and extracts title + price so the agent
+ * can call /purchase without needing a prior /search call.
+ * Use this when the user provides a specific product URL directly.
+ */
+const lookupProduct = async (req, res, next) => {
+  try {
+    const { url } = req.body;
+    if (!url) throw new AppError('url is required', 400, 'VALIDATION_ERROR');
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      throw new AppError('Invalid URL', 400, 'VALIDATION_ERROR');
+    }
+
+    const domain = parsedUrl.hostname.replace('www.', '');
+
+    // Fetch the page with a browser-like UA to avoid bot blocks
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let html = '';
+    try {
+      const resp = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'nl-NL,nl;q=0.9,en;q=0.8',
+        },
+      });
+      html = await resp.text();
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    // Extract title — try structured data first, then OG, then <title>
+    let title = '';
+    let price = null;
+    let image = '';
+
+    // JSON-LD structured data (most reliable)
+    const jsonLdMatch = html.match(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatch) {
+      for (const block of jsonLdMatch) {
+        try {
+          const inner = block.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
+          const data = JSON.parse(inner);
+          const items = Array.isArray(data) ? data : [data];
+          for (const item of items) {
+            if (item['@type'] === 'Product' || item['@type']?.includes?.('Product')) {
+              if (!title && item.name) title = item.name;
+              if (!image && item.image) image = Array.isArray(item.image) ? item.image[0] : item.image;
+              const offers = item.offers || item.Offers;
+              if (offers && !price) {
+                const offer = Array.isArray(offers) ? offers[0] : offers;
+                const raw = offer.price || offer.lowPrice;
+                if (raw) price = parseFloat(String(raw).replace(/[^0-9.]/g, ''));
+              }
+            }
+          }
+        } catch { /* malformed JSON-LD, skip */ }
+      }
+    }
+
+    // OG / meta fallback
+    if (!title) {
+      const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
+      const metaTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      title = ogTitle?.[1] || metaTitle?.[1] || '';
+    }
+    if (!image) {
+      const ogImage = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+      image = ogImage?.[1] || '';
+    }
+
+    // Price meta tags (common in e-commerce)
+    if (!price) {
+      const priceMeta = html.match(/<meta[^>]+(?:property="product:price:amount"|name="price"|itemprop="price")[^>]+content="([^"]+)"/i)
+        || html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:property="product:price:amount"|name="price"|itemprop="price")/i);
+      if (priceMeta?.[1]) price = parseFloat(priceMeta[1].replace(/[^0-9.]/g, ''));
+    }
+
+    // Clean up title
+    title = title.trim().replace(/\s+/g, ' ').substring(0, 200);
+
+    if (!title) {
+      throw new AppError(
+        `Could not extract product details from ${domain}. The site may block automated access. Try searching for the product instead.`,
+        422,
+        'LOOKUP_FAILED'
+      );
+    }
+
+    logger.info(`Agent ${req.agent.id} looked up product at ${domain}: "${title.substring(0, 60)}" price=${price}`);
+
+    res.json({
+      success: true,
+      data: {
+        product: {
+          title,
+          price: price || null,
+          retailer: domain,
+          url,
+          image,
+          source: 'url_lookup',
+        },
+        priceFound: price !== null,
+        agentMessage: price
+          ? `Found "${title}" at ${domain} for €${price}.`
+          : `Found "${title}" at ${domain} but couldn't extract the price automatically.`,
+        agentInstructions: price
+          ? `Product found. Confirm the details with the user ("I found [title] for €[price] at [retailer], shall I order it?"), then call /purchase with this product data.`
+          : `Product title found but price is missing. Ask the user: "I found [title] at [retailer] but couldn't read the price — what price does it show for you?" Then use their answer as the price when calling /purchase.`,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAgentIdentity,
   searchProducts,
+  lookupProduct,
   initiatePurchase,
   approveOrder,
   rejectOrder,

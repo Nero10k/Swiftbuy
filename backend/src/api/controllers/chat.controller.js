@@ -1,4 +1,4 @@
-const chatService = require('../../services/chat/chat.service');
+const chatService = require('../../services/chat/ai-chat.service');
 const ChatMessage = require('../../models/ChatMessage');
 const { AppError } = require('../middleware/errorHandler');
 const { generateId } = require('../../utils/helpers');

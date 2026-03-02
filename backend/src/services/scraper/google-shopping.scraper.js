@@ -19,6 +19,22 @@ const { parsePrice } = require('../../utils/helpers');
  * 3. Reliable (no CAPTCHA / bot detection)
  * 4. Returns structured data (prices, ratings, retailers, images)
  */
+
+/**
+ * Retailers that require an account to checkout — the AI checkout engine
+ * uses guest checkout only, so results from these are filtered out.
+ *
+ * Each entry is either:
+ *   { name: string }  — matched as exact retailer name (case-insensitive)
+ *   { domain: string } — matched as domain substring in the product URL
+ */
+const BLOCKED_RETAILERS = [
+  { name: 'amazon',      domain: 'amazon.'      }, // amazon.com, amazon.nl, amazon.de, etc.
+  { name: 'bol.com',     domain: 'bol.com'      }, // bol.com only, not lobbes/bolero
+  { name: 'zalando',     domain: 'zalando.'     },
+  { name: 'aliexpress',  domain: 'aliexpress.'  },
+  { name: 'ebay',        domain: 'ebay.'        },
+];
 class GoogleShoppingScraper extends BaseScraper {
   constructor() {
     super('google-shopping');
@@ -104,10 +120,19 @@ class GoogleShoppingScraper extends BaseScraper {
       });
 
       // Resolve Google redirect URLs → actual retailer URLs (for checkout engine)
-      const topProducts = products.slice(0, limit);
-      await this._resolveProductUrls(topProducts);
+      // Request extra candidates so we still have enough after filtering blocked retailers
+      const candidates = products.slice(0, limit * 3);
+      await this._resolveProductUrls(candidates);
 
-      return topProducts;
+      // Filter out retailers that require an account (guest checkout not supported).
+      // Must happen AFTER URL resolution — some Dutch shop listings resolve to amazon.nl/ebay.com.
+      const beforeBlock = candidates.length;
+      const filtered = candidates.filter((p) => !this._isBlockedRetailer(p.retailer, p.url));
+      if (filtered.length < beforeBlock) {
+        logger.info(`Filtered ${beforeBlock - filtered.length} results from account-required retailers`);
+      }
+
+      return filtered.slice(0, limit);
     } catch (error) {
       logger.error('Google Shopping API error:', { query, message: error.message });
       throw error;
@@ -164,17 +189,51 @@ class GoogleShoppingScraper extends BaseScraper {
   }
 
   /**
+   * Check if a retailer is blocked (requires account, no guest checkout).
+   * Matches by exact retailer name OR domain substring in the product URL.
+   */
+  _isBlockedRetailer(retailer, url) {
+    const name = (retailer || '').toLowerCase();
+    const urlLower = (url || '').toLowerCase();
+    return BLOCKED_RETAILERS.some(({ name: n, domain: d }) =>
+      name === n || (d && urlLower.includes(d))
+    );
+  }
+
+  /**
    * Clean retailer name
    */
   _cleanRetailer(source) {
     if (!source) return 'Web';
 
     const mappings = {
-      'amazon.com': 'Amazon',
+      // Netherlands / Benelux
+      'coolblue.nl': 'Coolblue',
+      'coolblue.be': 'Coolblue',
+      'mediamarkt.nl': 'MediaMarkt',
+      'mediamarkt.be': 'MediaMarkt',
+      'wehkamp.nl': 'Wehkamp',
+      'fonq.nl': 'Fonq',
+      'expert.nl': 'Expert',
+      'bcc.nl': 'BCC',
+      'alternate.nl': 'Alternate',
+      'vidaxl.nl': 'VidaXL',
+      'vidaxl.com': 'VidaXL',
+      'praxis.nl': 'Praxis',
+      'gamma.nl': 'Gamma',
+      'ikea.com': 'IKEA',
+      'hema.nl': 'HEMA',
+      'zara.com': 'Zara',
+      'nelly.com': 'Nelly',
+      'about-you.nl': 'About You',
+      'about-you.be': 'About You',
+      'boekenkraam.nl': 'Boekenkraam',
+      'bruna.nl': 'Bruna',
+      'managementboek.nl': 'Managementboek',
+      // US
       'walmart.com': 'Walmart',
       'target.com': 'Target',
       'bestbuy.com': 'Best Buy',
-      'ebay.com': 'eBay',
       'etsy.com': 'Etsy',
       'newegg.com': 'Newegg',
       'homedepot.com': 'Home Depot',
@@ -354,11 +413,28 @@ class GoogleShoppingScraper extends BaseScraper {
     if (!retailer) return null;
 
     const domainMap = {
-      'Amazon': 'amazon.com',
+      // Netherlands / Benelux
+      'Coolblue': 'coolblue.nl',
+      'MediaMarkt': 'mediamarkt.nl',
+      'Wehkamp': 'wehkamp.nl',
+      'Fonq': 'fonq.nl',
+      'Expert': 'expert.nl',
+      'BCC': 'bcc.nl',
+      'Alternate': 'alternate.nl',
+      'VidaXL': 'vidaxl.nl',
+      'Praxis': 'praxis.nl',
+      'Gamma': 'gamma.nl',
+      'IKEA': 'ikea.com',
+      'HEMA': 'hema.nl',
+      'Zara': 'zara.com',
+      'About You': 'about-you.nl',
+      'Boekenkraam': 'boekenkraam.nl',
+      'Bruna': 'bruna.nl',
+      'Managementboek': 'managementboek.nl',
+      // US
       'Walmart': 'walmart.com',
       'Target': 'target.com',
       'Best Buy': 'bestbuy.com',
-      'eBay': 'ebay.com',
       'Etsy': 'etsy.com',
       'Nike': 'nike.com',
       'Adidas': 'adidas.com',
