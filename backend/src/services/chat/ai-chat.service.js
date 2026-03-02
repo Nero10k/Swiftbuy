@@ -310,8 +310,12 @@ async function executeTool(toolName, toolInput, userId) {
       if (!order) return { error: 'Order not found' };
       if (order.userId.toString() !== userId.toString()) return { error: 'Not authorized' };
 
-      await purchaseService.approveOrder(toolInput.orderId, userId);
-      return { success: true, orderId: toolInput.orderId, status: 'approved' };
+      // Fire and forget — don't await the full checkout (takes 60-90s)
+      // Just kick it off and let the user poll via get_order_status
+      purchaseService.approveOrder(toolInput.orderId, userId).catch((err) => {
+        logger.warn(`[AiChat] approveOrder background error: ${err.message}`);
+      });
+      return { success: true, orderId: toolInput.orderId, status: 'processing', message: 'Order approved and checkout started. Use get_order_status to check progress.' };
     }
 
     case 'reject_order': {

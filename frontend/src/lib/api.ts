@@ -95,7 +95,7 @@ export const walletApi = {
 export const chatApi = {
   getWelcome: () => api.get('/chat/welcome'),
   sendMessage: (data: { message: string; conversationId?: string }) =>
-    api.post('/chat/message', data),
+    api.post('/chat/message', data, { timeout: 120000 }), // 2 min — approve triggers checkout
   getConversations: () => api.get('/chat/conversations'),
   getConversation: (conversationId: string) =>
     api.get(`/chat/conversations/${conversationId}`),
