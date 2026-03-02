@@ -278,16 +278,20 @@ function formatInline(text: string, isUser: boolean): React.ReactNode {
           return <em key={i} className="italic">{part.slice(1, -1)}</em>;
         const link = part.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
         if (link) {
-          const isViewLink = link[1].toLowerCase().includes('view');
+          const label = link[1];
+          const href = link[2];
+          const isViewLink = label.toLowerCase().includes('view');
+          // Strip trailing ↗ if Claude already added it, we'll add our own
+          const cleanLabel = label.replace(/\s*↗\s*$/, '').trim();
           return isViewLink ? (
-            <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer"
+            <a key={i} href={href} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1 mt-1 px-3 py-1 bg-brand-600/20 hover:bg-brand-600/40 border border-brand-500/30 hover:border-brand-400/60 text-brand-300 hover:text-brand-200 text-xs font-medium rounded-lg transition-all">
-              {link[1]} ↗
+              {cleanLabel} ↗
             </a>
           ) : (
-            <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer"
+            <a key={i} href={href} target="_blank" rel="noopener noreferrer"
               className="text-brand-400 hover:text-brand-300 underline underline-offset-2 transition-colors">
-              {link[1]}
+              {cleanLabel}
             </a>
           );
         }

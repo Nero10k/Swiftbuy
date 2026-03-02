@@ -48,7 +48,7 @@ const BASE_SYSTEM_PROMPT = `You are Swiftbuy, the user's personal shopping assis
 When the user asks for something:
 1. If needed, ask ONE clarifying question (budget, preference, size) — then search immediately.
 2. Call search_products with a specific query.
-3. Present **2–3 options maximum**: name, price (in local currency), retailer, rating if available, and the viewUrl as a markdown link [View →](url).
+3. Present **2–3 options maximum**: name, price (in local currency), retailer, rating if available, and a direct link to the product using the url field — format it as [View on {retailer} →](url) (replace {retailer} with the actual retailer name).
 4. Recommend the best one and ask: "Want me to order it?"
 
 If the user references a previous result by name or number (e.g. "the second one", "Little Dutch", "option 3"), **do NOT search again** — use the product data already shown in the conversation to initiate the purchase.
@@ -220,8 +220,7 @@ async function executeTool(toolName, toolInput, userId) {
       const effectiveQuery = needsHint ? `${toolInput.query} ${geo.name}` : toolInput.query;
       const results = await searchService.search(effectiveQuery, filters, limit, {}, geo);
 
-      // Save search session for viewUrl links
-      const frontendUrl = process.env.FRONTEND_URL || 'https://swiftbuy-app.vercel.app';
+      // Save search session (product detail page reads from this)
       let sessionId = null;
       if (results.products?.length > 0) {
         sessionId = generateId('srch');
@@ -249,7 +248,7 @@ async function executeTool(toolName, toolInput, userId) {
         }
       }
 
-      const products = (results.products || []).map((p, i) => ({
+      const products = (results.products || []).map((p) => ({
         title: p.title,
         price: p.price,
         currency: geo.currency,
@@ -258,7 +257,6 @@ async function executeTool(toolName, toolInput, userId) {
         url: p.url,
         image: p.image || p.imageUrl || '',
         rating: p.rating,
-        viewUrl: sessionId ? `${frontendUrl}/product/${sessionId}/${i}` : undefined,
       }));
 
       return {
