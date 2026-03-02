@@ -25,11 +25,8 @@ const { generateId } = require('../../utils/helpers');
 const { getUserCountry, getGeoForCountry } = require('../../utils/geo');
 const config = require('../../config');
 
-const apiKey = config.checkout.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-if (!apiKey) {
-  throw new Error('ANTHROPIC_API_KEY is not set — AI chat will not work. Set it in Railway environment variables.');
-}
-const client = new Anthropic({ apiKey });
+const apiKey = process.env.ANTHROPIC_API_KEY || config.checkout.anthropicApiKey;
+const client = new Anthropic({ apiKey: apiKey || 'missing' });
 
 // ─── Model ──────────────────────────────────────────────────────────────────
 const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-haiku-4-5-20251001';

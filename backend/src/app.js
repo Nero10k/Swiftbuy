@@ -44,7 +44,6 @@ app.get('/health', (req, res) => {
       serperConfigured: !!process.env.SERPER_API_KEY,
       playwrightEnabled: config.env === 'development',
       anthropicConfigured: !!process.env.ANTHROPIC_API_KEY,
-      chatServiceLoaded: !!require('./services/chat/ai-chat.service'),
     },
   });
 });
