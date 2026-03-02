@@ -471,64 +471,79 @@ class AiChatService {
     let loopMessages = [...anthropicMessages];
     const MAX_TOOL_ROUNDS = 8; // prevent infinite loops
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const response = await client.messages.create({
-        model: CHAT_MODEL,
-        max_tokens: 2048,
-        system: systemPrompt,
-        tools: TOOLS,
-        messages: loopMessages,
-      });
+    try {
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        const response = await client.messages.create({
+          model: CHAT_MODEL,
+          max_tokens: 2048,
+          system: systemPrompt,
+          tools: TOOLS,
+          messages: loopMessages,
+        });
 
-      if (response.stop_reason === 'end_turn') {
-        // Claude returned a text response — we're done
-        finalText = response.content
-          .filter((b) => b.type === 'text')
-          .map((b) => b.text)
-          .join('\n')
-          .trim();
-        break;
-      }
-
-      if (response.stop_reason === 'tool_use') {
-        // Execute all tool calls in this turn
-        const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use');
-        const toolResultBlocks = [];
-
-        for (const toolUse of toolUseBlocks) {
-          logger.info(`[AiChat] Tool call: ${toolUse.name} — ${JSON.stringify(toolUse.input).substring(0, 120)}`);
-          let result;
-          try {
-            result = await executeTool(toolUse.name, toolUse.input, userId);
-          } catch (err) {
-            logger.warn(`[AiChat] Tool ${toolUse.name} error: ${err.message}`);
-            result = { error: err.message };
-          }
-
-          toolResultBlocks.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: JSON.stringify(result),
-          });
+        if (response.stop_reason === 'end_turn') {
+          // Claude returned a text response — we're done
+          finalText = response.content
+            .filter((b) => b.type === 'text')
+            .map((b) => b.text)
+            .join('\n')
+            .trim();
+          break;
         }
 
-        // Append assistant's tool_use turn + tool results to the loop
-        loopMessages = [
-          ...loopMessages,
-          { role: 'assistant', content: response.content },
-          { role: 'user', content: toolResultBlocks },
-        ];
-        continue;
-      }
+        if (response.stop_reason === 'tool_use') {
+          // Execute all tool calls in this turn
+          const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use');
+          const toolResultBlocks = [];
 
-      // Unexpected stop reason
-      logger.warn(`[AiChat] Unexpected stop_reason: ${response.stop_reason}`);
-      finalText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-      break;
+          for (const toolUse of toolUseBlocks) {
+            logger.info(`[AiChat] Tool call: ${toolUse.name} — ${JSON.stringify(toolUse.input).substring(0, 120)}`);
+            let result;
+            try {
+              result = await executeTool(toolUse.name, toolUse.input, userId);
+            } catch (err) {
+              logger.warn(`[AiChat] Tool ${toolUse.name} error: ${err.message}`);
+              result = { error: err.message };
+            }
+
+            toolResultBlocks.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(result),
+            });
+          }
+
+          // Append assistant's tool_use turn + tool results to the loop
+          loopMessages = [
+            ...loopMessages,
+            { role: 'assistant', content: response.content },
+            { role: 'user', content: toolResultBlocks },
+          ];
+          continue;
+        }
+
+        // Unexpected stop reason
+        logger.warn(`[AiChat] Unexpected stop_reason: ${response.stop_reason}`);
+        finalText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+        break;
+      }
+    } catch (aiErr) {
+      // Convert Anthropic/network errors into friendly chat messages instead of crashing
+      logger.error(`[AiChat] AI loop error: ${aiErr.message}`);
+      const status = aiErr.status || aiErr.statusCode || 0;
+      if (status === 429) {
+        finalText = "I'm getting a lot of requests right now — give me a moment and try again.";
+      } else if (status === 400 && aiErr.message?.includes('credit')) {
+        finalText = "I'm temporarily unavailable due to a service issue. Please try again shortly.";
+      } else if (aiErr.message?.toLowerCase().includes('timeout') || aiErr.code === 'ECONNABORTED') {
+        finalText = "That search took too long to complete. Try a more specific query — for example, add a budget or brand.";
+      } else {
+        finalText = "I ran into an issue on my end. Please try sending your message again.";
+      }
     }
 
     if (!finalText) {
-      finalText = "Sorry, I couldn't complete that request. Please try again.";
+      finalText = "I didn't get a response — please try again.";
     }
 
     // Save and return the assistant reply

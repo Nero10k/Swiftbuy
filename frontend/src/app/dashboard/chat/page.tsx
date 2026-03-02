@@ -113,8 +113,31 @@ export default function ChatPage() {
       setConversationId(convId);
       setMessages((prev) => [...prev, { id: response.id, role: 'assistant', content: response.content, metadata: response.metadata, createdAt: response.createdAt }]);
     } catch (err: any) {
-      const errMsg = err?.response?.data?.error?.message || err?.message || "Something went wrong";
-      setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}` }]);
+      let friendlyMsg: string;
+      const status = err?.response?.status;
+      const serverMsg: string = err?.response?.data?.error?.message || '';
+
+      if (!err?.response) {
+        // No response at all — network timeout or connection refused
+        friendlyMsg = "I couldn't reach the server — the request may have timed out. Try a shorter or more specific query, or try again in a moment.";
+      } else if (status === 429) {
+        friendlyMsg = "I'm handling a lot of requests right now. Please wait a moment and try again.";
+      } else if (status === 504 || status === 502 || status === 503) {
+        friendlyMsg = "The server took too long to respond. Try a simpler query or give it a few seconds.";
+      } else if (status === 401 || status === 403) {
+        friendlyMsg = "Your session may have expired. Try refreshing the page.";
+      } else if (serverMsg) {
+        // Backend returned an error message — show it if it looks user-friendly,
+        // otherwise fall back to generic
+        const looksInternal = /api|key|token|anthropic|sdk|stack|error:|exception/i.test(serverMsg);
+        friendlyMsg = looksInternal
+          ? "I ran into a problem on my end. Please try again."
+          : serverMsg;
+      } else {
+        friendlyMsg = "Something went wrong. Please try again.";
+      }
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: friendlyMsg }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
