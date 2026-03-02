@@ -1,7 +1,15 @@
-const chatService = require('../../services/chat/ai-chat.service');
 const ChatMessage = require('../../models/ChatMessage');
 const { AppError } = require('../middleware/errorHandler');
 const { generateId } = require('../../utils/helpers');
+const logger = require('../../utils/logger');
+
+// Lazy-load so a missing API key surfaces as a proper error at request time
+let chatService;
+try {
+  chatService = require('../../services/chat/ai-chat.service');
+} catch (e) {
+  logger.error(`[Chat] Failed to load ai-chat.service: ${e.message}`);
+}
 
 /**
  * Chat: Send a message
@@ -13,6 +21,10 @@ const sendMessage = async (req, res, next) => {
 
     if (!message || !message.trim()) {
       throw new AppError('Message is required', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!chatService) {
+      throw new AppError('Chat service unavailable — ANTHROPIC_API_KEY may not be set in environment variables.', 503, 'SERVICE_UNAVAILABLE');
     }
 
     // Use existing conversation or create new one
@@ -32,6 +44,7 @@ const sendMessage = async (req, res, next) => {
       },
     });
   } catch (error) {
+    logger.error(`[Chat] sendMessage error: ${error.message}`);
     next(error);
   }
 };

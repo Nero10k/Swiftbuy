@@ -112,8 +112,9 @@ export default function ChatPage() {
       const { conversationId: convId, message: response } = res.data.data;
       setConversationId(convId);
       setMessages((prev) => [...prev, { id: response.id, role: 'assistant', content: response.content, metadata: response.metadata, createdAt: response.createdAt }]);
-    } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: "Sorry, I couldn't process that. Please try again." }]);
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error?.message || err?.message || "Something went wrong";
+      setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}` }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
