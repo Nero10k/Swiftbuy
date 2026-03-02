@@ -80,7 +80,7 @@ class GoogleShoppingScraper extends BaseScraper {
       };
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s — keep total request under 30s
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
