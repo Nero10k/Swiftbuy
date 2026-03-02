@@ -67,9 +67,9 @@ Before purchasing clothing, shoes, or food, call get_user_profile to check:
 2. If the response contains missingInfo — tell the user what's missing before approving.
 3. If requiresApproval is true, ask the user directly AND always include the orderId in your reply in this exact format so you can find it later:
    > I've prepared your order: **[product]** — [price]. Should I go ahead and confirm?
-   > `order_ref:[orderId]`
+   > order_ref:[orderId]
 4. When the user says yes ("yes", "go ahead", "book it", "confirm"):
-   - Look in the recent conversation for the `order_ref:` line to get the orderId.
+   - Look in the recent conversation for the "order_ref:" line to get the orderId.
    - If you can't find it in the text, call get_recent_orders to find the most recent pending order.
    - Call approve_order with that orderId.
 5. After approve_order returns success, **immediately return a text response** — do NOT call get_order_status in this same turn. Say:
