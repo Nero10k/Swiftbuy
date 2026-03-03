@@ -492,10 +492,10 @@ class PurchaseService {
             );
           }
 
-          // Get card details — real from Karma, or test card for dry-run
+          // Get card details — real from Karma, or test card for dry-run / demo mode
           let cardDetails;
-          if (isDryRun) {
-            logger.info(`🧪 DRY-RUN CHECKOUT — using test Visa card for ${order.orderId}`);
+          if (isDryRun || config.checkout.demoMode) {
+            logger.info(`🧪 ${isDryRun ? 'DRY-RUN' : 'DEMO_MODE'} CHECKOUT — using test Visa card for ${order.orderId}`);
             cardDetails = {
               number: '4111111111111111',
               cvv: '123',
