@@ -97,9 +97,10 @@ class PurchaseService {
     const shippingCost = product.shippingCost || 0;
     const totalAmount = product.price + shippingCost;
 
-    // 5. Check wallet balance via Karma can-spend (skip in mock mode)
+    // 5. Check wallet balance via Karma can-spend (skip in mock/demo mode)
+    if (config.checkout.demoMode) logger.info(`🎬 DEMO_MODE — skipping Karma balance check for ${product.title}`);
     const karmaStatus = karmaClient.checkStatus(user);
-    if (!config.checkout.mockCheckout && karmaStatus.ready && user.karma?.skAgent) {
+    if (!config.checkout.mockCheckout && !config.checkout.demoMode && karmaStatus.ready && user.karma?.skAgent) {
       try {
         const spendCheck = await karmaClient.canSpend(user.karma.skAgent, totalAmount, 'USD');
         if (!spendCheck.allowed) {
@@ -358,7 +359,7 @@ class PurchaseService {
       const karmaStatus = karmaClient.checkStatus(user);
       let transferResult;
 
-      if (!isMockMode && karmaStatus.ready && user.karma?.skAgent) {
+      if (!isMockMode && !config.checkout.demoMode && karmaStatus.ready && user.karma?.skAgent) {
         try {
           // Verify we can still spend
           const spendCheck = await karmaClient.canSpend(user.karma.skAgent, order.payment.amount, 'USD');
