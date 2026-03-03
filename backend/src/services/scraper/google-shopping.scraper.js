@@ -409,6 +409,47 @@ class GoogleShoppingScraper extends BaseScraper {
   }
 
   /**
+   * Resolve a single google.com shopping URL to a direct retailer product URL.
+   * Used at purchase time so we only make one Serper call (vs. 15 at search time).
+   * Returns the resolved URL string, or null if resolution failed.
+   */
+  async resolveOneUrl(title, retailer, currentUrl) {
+    if (!this.apiKey) return null;
+    if (currentUrl && !currentUrl.includes('google.com')) return currentUrl; // already direct
+
+    try {
+      const retailerDomain = this._getRetailerDomain(retailer);
+      const searchQuery = retailerDomain
+        ? `${title} site:${retailerDomain}`
+        : `${title} ${retailer || ''} buy`.trim();
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': this.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: searchQuery, num: 3 }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      for (const result of (data.organic || [])) {
+        if (result.link && !result.link.includes('google.com')) {
+          logger.info(`[resolveOneUrl] "${title.substring(0, 40)}" → ${result.link.substring(0, 80)}`);
+          return result.link;
+        }
+      }
+    } catch (err) {
+      logger.warn(`[resolveOneUrl] Failed for "${title?.substring(0, 40)}": ${err.message}`);
+    }
+    return null;
+  }
+
+  /**
    * Map retailer name to domain for targeted site: search
    */
   _getRetailerDomain(retailer) {

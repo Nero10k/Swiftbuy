@@ -4,6 +4,7 @@ const Product = require('../../models/Product');
 const User = require('../../models/User');
 const karmaClient = require('../wallet/wallet.client');
 const checkoutAutomation = require('./checkout.automation');
+const googleShoppingScraper = require('../scraper/google-shopping.scraper');
 const searchService = require('../search/search.service');
 const notificationService = require('../notification/notification.service');
 const logger = require('../../utils/logger');
@@ -453,10 +454,30 @@ class PurchaseService {
       let checkoutResult;
       const isDryRun = config.checkout.dryRunCheckout;
 
+      // Resolve google.com shopping URLs → real retailer product URLs.
+      // Serper returns google.com comparison pages by default (URL resolution
+      // is skipped during search to avoid timeouts). We resolve the single
+      // purchased product here — one Serper call, only when needed.
+      if (order.product.url && order.product.url.includes('google.com')) {
+        logger.info(`Resolving google.com URL for checkout: ${order.product.title}`);
+        const resolved = await googleShoppingScraper.resolveOneUrl(
+          order.product.title,
+          order.product.retailer,
+          order.product.url
+        );
+        if (resolved) {
+          logger.info(`Resolved to: ${resolved}`);
+          order.product.url = resolved;
+          await order.save();
+        } else {
+          logger.warn(`Could not resolve URL for ${order.product.title} — checkout may fail`);
+        }
+      }
+
       // Determine if we should run the real checkout engine:
       //   - Normal mode (!isMockMode): always run if ready
       //   - Dry-run mode (isMockMode + dryRunCheckout): run with test card, stop before submit
-      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && order.product.url;
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && order.product.url && !order.product.url.includes('google.com');
 
       if (shouldRunRealCheckout) {
         // Real checkout (or dry-run checkout)
