@@ -192,13 +192,19 @@ class GoogleShoppingScraper extends BaseScraper {
 
   /**
    * Check if a retailer is blocked (requires account, no guest checkout).
-   * Matches by exact retailer name OR domain substring in the product URL.
+   *
+   * Matching strategy (OR):
+   *   1. name startsWith n  — catches "amazon.nl", "amazon.de", "zalando.nl", "ebay.nl", etc.
+   *      Serper sometimes returns localised names (e.g. "Amazon.nl" instead of "Amazon")
+   *      so we use startsWith rather than exact equality.
+   *   2. url includes domain — catches cases where the URL was resolved to the retailer domain
+   *      even if the retailer name wasn't normalised (e.g. google.com → amazon.nl link)
    */
   _isBlockedRetailer(retailer, url) {
     const name = (retailer || '').toLowerCase();
     const urlLower = (url || '').toLowerCase();
     return BLOCKED_RETAILERS.some(({ name: n, domain: d }) =>
-      name === n || (d && urlLower.includes(d))
+      name.startsWith(n) || (d && urlLower.includes(d))
     );
   }
 

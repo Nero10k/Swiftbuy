@@ -491,7 +491,14 @@ class PurchaseService {
       //   - Normal mode (!isMockMode): always run if ready
       //   - Dry-run mode (isMockMode + dryRunCheckout): run with test card, stop before submit
       //   - Blocked retailer: always skip — browser would fail at login wall
-      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && !!order.product.url && !isBlockedRetailerUrl;
+      // NOTE: checkoutAutomation.isReady() is a sync config-only check (always true when
+      // USE_BROWSER_USE=true). We do the actual agent health ping here so we know up-front
+      // whether the Python agent is reachable before committing to real checkout.
+      const agentAlive = await checkoutAutomation._isBrowserUseAvailable();
+      if (!agentAlive) {
+        logger.warn(`[${order.orderId}] Browser Use agent not reachable — falling back to mock checkout`);
+      }
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && agentAlive && !!order.product.url && !isBlockedRetailerUrl;
 
       if (shouldRunRealCheckout) {
         // Real checkout (or dry-run checkout)
