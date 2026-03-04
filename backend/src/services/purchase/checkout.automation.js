@@ -94,26 +94,48 @@ class CheckoutAutomation {
         if (result.success) {
           return result;
         }
-        
-        // If Browser Use failed, decide whether to fall back
+
+        // If Browser Use failed AND we're in browser-use-only mode, return the
+        // failure result directly — do NOT fall back to Anthropic Computer Use.
+        // The Anthropic fallback uses local Playwright on Railway which is unreliable
+        // and does not show up in Steel.dev Remote Browsers, causing confusing behavior.
+        if (config.checkout.useBrowserUse) {
+          logger.warn(`[${checkoutId}] Browser Use failed (${result.error}) — browser-use-only mode, no fallback`);
+          return result;
+        }
+
+        // Non-browser-use mode: fall through to Anthropic Computer Use below
         if (this.anthropic) {
           logger.warn(`[${checkoutId}] Browser Use failed (${result.error}), falling back to Anthropic Computer Use`);
-          // Fall through to the old engine below
         } else {
-          // No fallback available — return the Browser Use result as-is
           return result;
         }
       } catch (buError) {
+        if (config.checkout.useBrowserUse) {
+          logger.warn(`[${checkoutId}] Browser Use error (${buError.message}) — browser-use-only mode, no fallback`);
+          throw buError;
+        }
         if (this.anthropic) {
           logger.warn(`[${checkoutId}] Browser Use error (${buError.message}), falling back to Anthropic Computer Use`);
         } else {
           throw buError;
         }
       }
+    } else if (config.checkout.useBrowserUse) {
+      // Browser-use is configured but agent isn't reachable — return failure immediately.
+      // Do NOT fall back to Anthropic Computer Use (local Playwright, no Steel.dev session).
+      logger.warn(`[${checkoutId}] Browser Use agent unreachable — browser-use-only mode, returning failure`);
+      return {
+        success: false,
+        error: 'Browser Use agent not reachable',
+        executionMs: 0,
+        llmCalls: 0,
+        usedSavedFlow: false,
+      };
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // FALLBACK: ANTHROPIC COMPUTER USE (Legacy — more expensive)
+    // FALLBACK: ANTHROPIC COMPUTER USE (Legacy — only when USE_BROWSER_USE=false)
     // ═══════════════════════════════════════════════════════════════
     if (!this.anthropic) {
       throw new Error('No checkout engine available: Browser Use agent is not running and ANTHROPIC_API_KEY is missing');
