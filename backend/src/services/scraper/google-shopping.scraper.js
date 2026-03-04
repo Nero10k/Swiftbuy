@@ -124,7 +124,7 @@ class GoogleShoppingScraper extends BaseScraper {
       // Only resolve when resolveUrls=true (e.g. right before checkout).
       const candidates = products.slice(0, limit * 3);
       if (resolveUrls) {
-        await this._resolveProductUrls(candidates);
+        await this._resolveProductUrls(candidates, geo);
       }
 
       // Filter out retailers that require an account (guest checkout not supported).
@@ -354,7 +354,7 @@ class GoogleShoppingScraper extends BaseScraper {
    *   "Product Title" site:retailer.com
    * This gives us the actual product page URL the checkout engine can navigate to.
    */
-  async _resolveProductUrls(products) {
+  async _resolveProductUrls(products, geo = null) {
     if (!this.apiKey) return;
 
     const resolvePromises = products.map(async (product) => {
@@ -367,11 +367,14 @@ class GoogleShoppingScraper extends BaseScraper {
 
       // Try to find the direct product page via organic search
       try {
-        // Build a targeted search query
+        // Build a targeted search query.
+        // If no domain mapping exists (e.g. Sony, a manufacturer), add the user's country
+        // so organic results are country-local retailer pages, not the brand's US store.
         const retailerDomain = this._getRetailerDomain(product.retailer);
+        const countryHint = geo?.name || '';
         const searchQuery = retailerDomain
           ? `${product.title} site:${retailerDomain}`
-          : `${product.title} buy`;
+          : `${product.title}${countryHint ? ` ${countryHint}` : ''} buy`.trim();
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
@@ -427,15 +430,16 @@ class GoogleShoppingScraper extends BaseScraper {
    * Used at purchase time so we only make one Serper call (vs. 15 at search time).
    * Returns the resolved URL string, or null if resolution failed.
    */
-  async resolveOneUrl(title, retailer, currentUrl) {
+  async resolveOneUrl(title, retailer, currentUrl, geo = null) {
     if (!this.apiKey) return null;
     if (currentUrl && !currentUrl.includes('google.com')) return currentUrl; // already direct
 
     try {
       const retailerDomain = this._getRetailerDomain(retailer);
+      const countryHint = geo?.name || '';
       const searchQuery = retailerDomain
         ? `${title} site:${retailerDomain}`
-        : `${title} ${retailer || ''} buy`.trim();
+        : `${title}${countryHint ? ` ${countryHint}` : ` ${retailer || ''}`} buy`.trim();
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);

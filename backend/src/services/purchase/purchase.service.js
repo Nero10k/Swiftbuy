@@ -9,6 +9,7 @@ const searchService = require('../search/search.service');
 const notificationService = require('../notification/notification.service');
 const logger = require('../../utils/logger');
 const { generateId } = require('../../utils/helpers');
+const { getUserCountry, getGeoForCountry } = require('../../utils/geo');
 const config = require('../../config');
 const { AppError } = require('../../api/middleware/errorHandler');
 
@@ -469,10 +470,15 @@ class PurchaseService {
 
         if (needsResolution || hasNoUrl) {
           logger.info(`[${order.orderId}] ${hasNoUrl ? 'No URL — attempting lookup' : 'Resolving google.com URL'} for: ${order.product.title} @ ${order.product.retailer}`);
+          // Pass user's geo so resolution finds country-local retailer pages (e.g. NL user
+          // searching for Sony gets coolblue.nl/mediamarkt.nl instead of sony.com).
+          const userCountry = getUserCountry(user.shippingAddresses);
+          const geo = getGeoForCountry(userCountry);
           const resolved = await googleShoppingScraper.resolveOneUrl(
             order.product.title,
             order.product.retailer,
-            order.product.url || ''
+            order.product.url || '',
+            geo
           );
           if (resolved) {
             logger.info(`[${order.orderId}] URL resolved: ${resolved}`);
