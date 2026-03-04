@@ -29,9 +29,9 @@ const apiKey = process.env.ANTHROPIC_API_KEY || config.checkout.anthropicApiKey;
 const client = new Anthropic({ apiKey: apiKey || 'missing' });
 
 // ─── Model ──────────────────────────────────────────────────────────────────
-// Use claude-3-5-haiku as a stable, known-valid default.
-// Override via CHAT_LLM_MODEL env var in Railway if you want a newer model.
-const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-3-5-haiku-20241022';
+// claude-3-5-haiku-20241022 reached EOL on 2026-02-19 — use haiku-4-5 instead.
+// Override via CHAT_LLM_MODEL env var in Railway if you want a different model.
+const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-haiku-4-5-20251001';
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 const BASE_SYSTEM_PROMPT = `You are Swiftbuy, the user's personal shopping assistant. You search, compare, and purchase — all within this conversation.
@@ -195,6 +195,7 @@ const TOOLS = [
       properties: {
         limit: { type: 'number', description: 'Number of recent orders to fetch (default 5)' },
       },
+      required: [],
     },
   },
   {
@@ -203,6 +204,7 @@ const TOOLS = [
     input_schema: {
       type: 'object',
       properties: {},
+      required: [],
     },
   },
 ];
