@@ -1,6 +1,7 @@
 const { getRedisClient } = require('../../config/redis');
 const Product = require('../../models/Product');
 const scraperManager = require('../scraper/scraper.manager');
+const googleShoppingScraper = require('../scraper/google-shopping.scraper');
 const queryProcessor = require('./query-processor');
 const logger = require('../../utils/logger');
 const { sanitizeQuery } = require('../../utils/helpers');
@@ -63,21 +64,32 @@ class SearchService {
 
     if (cached) {
       logger.info(`Cache hit for "${searchQuery}" (${cached.length} products)`);
+      // Resolve any google.com URLs still in the cache (pre-fix cached entries).
+      // After resolution, update the cache so next hit is already clean.
+      const hasGoogleUrls = cached.some((p) => p.url && p.url.includes('google.com'));
+      if (hasGoogleUrls) {
+        logger.info(`[cache] Resolving stale google.com URLs in cached results for "${searchQuery}"`);
+        await googleShoppingScraper._resolveProductUrls(cached);
+        await this._saveToCache(cacheKey, cached);
+      }
+      const cleanCached = cached.filter((p) => !p.url || !p.url.includes('google.com'));
       return {
-        products: cached,
+        products: cleanCached.slice(0, limit),
         meta: {
           source: 'cache',
           query: rawQuery,
           processedQuery: searchQuery,
           intent: processed.intent,
           category: processed.category,
-          resultCount: cached.length,
-          retailers: [...new Set(cached.map((p) => p.retailer))],
+          resultCount: cleanCached.length,
+          retailers: [...new Set(cleanCached.map((p) => p.retailer))],
         },
       };
     }
 
     // Step 3: Search the web (routed by intent)
+    // resolveUrls=true: resolve google.com shopping URLs → real retailer product pages
+    // at search time so Claude always has a usable URL when calling initiate_purchase.
     let products;
     if (filters.retailers && filters.retailers.length > 0) {
       // Specific retailer search
@@ -90,11 +102,13 @@ class SearchService {
         .filter((r) => r.status === 'fulfilled')
         .flatMap((r) => r.value);
     } else {
-      // Universal search — intelligently routed by intent
-      // Flights → Google Flights, Hotels → Google Hotels, Products → Google Shopping + Amazon
-      // Geo params ensure results are localized to the user's country
-      products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent, geo);
+      // Universal search — resolveUrls=true ensures we get direct retailer URLs
+      products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent, geo, true);
     }
+
+    // Drop any products whose URL still couldn't be resolved (unresolvable google.com URLs
+    // are useless for checkout and waste the browser agent on a dead-end page).
+    products = products.filter((p) => !p.url || !p.url.includes('google.com'));
 
     // Step 4: Save to cache + DB
     if (products.length > 0) {
