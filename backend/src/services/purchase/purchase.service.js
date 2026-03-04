@@ -461,19 +461,26 @@ class PurchaseService {
       // Skip resolution if the retailer name is already on the blocked list —
       // no point spending a Serper call on a doomed checkout.
       const isBlockedByName = googleShoppingScraper.isBlockedRetailer(order.product.retailer, '');
-      if (order.product.url && order.product.url.includes('google.com') && !isBlockedByName) {
-        logger.info(`Resolving google.com URL for checkout: ${order.product.title}`);
-        const resolved = await googleShoppingScraper.resolveOneUrl(
-          order.product.title,
-          order.product.retailer,
-          order.product.url
-        );
-        if (resolved) {
-          logger.info(`Resolved to: ${resolved}`);
-          order.product.url = resolved;
-          await order.save();
-        } else {
-          logger.warn(`Could not resolve URL for ${order.product.title} — checkout may fail`);
+      logger.info(`[${order.orderId}] URL pre-checkout: retailer="${order.product.retailer}" url="${order.product.url || '(empty)'}" isBlockedByName=${isBlockedByName}`);
+
+      if (!isBlockedByName) {
+        const needsResolution = order.product.url && order.product.url.includes('google.com');
+        const hasNoUrl = !order.product.url;
+
+        if (needsResolution || hasNoUrl) {
+          logger.info(`[${order.orderId}] ${hasNoUrl ? 'No URL — attempting lookup' : 'Resolving google.com URL'} for: ${order.product.title} @ ${order.product.retailer}`);
+          const resolved = await googleShoppingScraper.resolveOneUrl(
+            order.product.title,
+            order.product.retailer,
+            order.product.url || ''
+          );
+          if (resolved) {
+            logger.info(`[${order.orderId}] URL resolved: ${resolved}`);
+            order.product.url = resolved;
+            await order.save();
+          } else {
+            logger.warn(`[${order.orderId}] Could not resolve URL for "${order.product.title}" — checkout may fail or be skipped`);
+          }
         }
       }
 
@@ -494,7 +501,11 @@ class PurchaseService {
       // NOTE: checkoutAutomation.isReady() is sync (reads config flag, never pings agent).
       // The actual Python agent health check happens inside executeCheckout with a longer
       // timeout so it isn't affected by transient Railway network jitter.
-      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && !!order.product.url && !isBlockedRetailerUrl;
+      const isAutomationReady = checkoutAutomation.isReady();
+      const hasUrl = !!order.product.url;
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && isAutomationReady && hasUrl && !isBlockedRetailerUrl;
+
+      logger.info(`[${order.orderId}] 🔍 checkout gate: shouldRun=${shouldRunRealCheckout} | isMockMode=${isMockMode} isDryRun=${isDryRun} isReady=${isAutomationReady} hasUrl=${hasUrl} isBlocked=${isBlockedRetailerUrl} | retailer="${order.product.retailer}" url="${order.product.url || '(empty)'}"`);
 
       if (shouldRunRealCheckout) {
         // Real checkout (or dry-run checkout)
@@ -575,8 +586,13 @@ class PurchaseService {
           );
         }
       } else {
-        // Mock mode — checkout engine not configured or no product URL
-        logger.warn(`Checkout engine not available for ${order.orderId} (configured: ${checkoutAutomation.isReady()}, hasUrl: ${!!order.product.url}). Using mock.`);
+        // Real checkout skipped — log exact reason
+        const skipReasons = [];
+        if (isMockMode && !isDryRun) skipReasons.push('MOCK_CHECKOUT=true and DRY_RUN=false');
+        if (!isAutomationReady) skipReasons.push('checkout automation not ready (USE_BROWSER_USE not set?)');
+        if (!hasUrl) skipReasons.push('product URL is empty');
+        if (isBlockedRetailerUrl) skipReasons.push(`"${order.product.retailer}" is a blocked retailer`);
+        logger.warn(`⏭️ [${order.orderId}] Skipping real checkout — ${skipReasons.join('; ')}. Using mock result.`);
         checkoutResult = {
           success: true,
           retailerOrderId: generateId('ret'),
