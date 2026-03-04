@@ -78,7 +78,7 @@ Before purchasing clothing, shoes, or food, call get_user_profile to check:
 3. If requiresApproval is true, ask the user directly AND always embed the EXACT orderId from the initiate_purchase tool response (never invent one):
    > I've prepared your order: **[product]** — [price]. Should I go ahead and confirm?
    > order_ref:[EXACT orderId from tool response — e.g. 68a3f9c2e4b0123456789abc]
-   CRITICAL: The orderId is the value returned in the `orderId` field of the initiate_purchase result. Never write "pending_order_001" or any placeholder — always use the actual value.
+   CRITICAL: The orderId is the value returned in the \`orderId\` field of the initiate_purchase result. Never write "pending_order_001" or any placeholder — always use the actual value.
 4. When the user says yes ("yes", "go ahead", "book it", "confirm"):
    - Look in the recent conversation for the "order_ref:" line to get the orderId.
    - If you can't find it in the text, call get_recent_orders to find the most recent pending order.
