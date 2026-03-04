@@ -16,6 +16,9 @@ const chatRoutes = require('./api/routes/chat.routes');
 
 const app = express();
 
+// Trust Railway's proxy so express-rate-limit can read X-Forwarded-For correctly
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors());
