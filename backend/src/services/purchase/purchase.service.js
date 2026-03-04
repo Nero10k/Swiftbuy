@@ -477,7 +477,8 @@ class PurchaseService {
       // Determine if we should run the real checkout engine:
       //   - Normal mode (!isMockMode): always run if ready
       //   - Dry-run mode (isMockMode + dryRunCheckout): run with test card, stop before submit
-      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && order.product.url && !order.product.url.includes('google.com');
+      // Note: google.com shopping URLs are allowed — the browser agent can navigate from them
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && !!order.product.url;
 
       if (shouldRunRealCheckout) {
         // Real checkout (or dry-run checkout)
