@@ -483,13 +483,27 @@ class PurchaseService {
         // Real checkout (or dry-run checkout)
         try {
           // Verify we have a shipping address (required for physical products)
-          const shippingAddress = order.shippingAddress;
+          // In DEMO_MODE, fall back to a dummy address so the browser still launches
+          let shippingAddress = order.shippingAddress;
           if (!shippingAddress || !shippingAddress.street) {
-            throw new AppError(
-              'Shipping address is required for checkout. Please add an address in your Swiftbuy dashboard settings.',
-              400,
-              'NO_SHIPPING_ADDRESS'
-            );
+            if (config.checkout.demoMode) {
+              logger.info(`🎬 DEMO_MODE — no shipping address on order, using demo address for ${order.orderId}`);
+              shippingAddress = {
+                fullName: user.name || 'Demo User',
+                street: '123 Demo Street',
+                city: 'Amsterdam',
+                state: 'Noord-Holland',
+                zipCode: '1011 AB',
+                country: 'NL',
+                phone: '+31612345678',
+              };
+            } else {
+              throw new AppError(
+                'Shipping address is required for checkout. Please add an address in your Swiftbuy dashboard settings.',
+                400,
+                'NO_SHIPPING_ADDRESS'
+              );
+            }
           }
 
           // Get card details — real from Karma, or test card for dry-run / demo mode
