@@ -29,7 +29,9 @@ const apiKey = process.env.ANTHROPIC_API_KEY || config.checkout.anthropicApiKey;
 const client = new Anthropic({ apiKey: apiKey || 'missing' });
 
 // ─── Model ──────────────────────────────────────────────────────────────────
-const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-haiku-4-5-20251001';
+// Use claude-3-5-haiku as a stable, known-valid default.
+// Override via CHAT_LLM_MODEL env var in Railway if you want a newer model.
+const CHAT_MODEL = process.env.CHAT_LLM_MODEL || 'claude-3-5-haiku-20241022';
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 const BASE_SYSTEM_PROMPT = `You are Swiftbuy, the user's personal shopping assistant. You search, compare, and purchase — all within this conversation.
@@ -641,13 +643,23 @@ class AiChatService {
 
       return { text: "I reached my limit on this request. Please try again." };
     } catch (aiErr) {
-      logger.error(`[AiChat] AI loop error: ${aiErr.message}`);
       const status = aiErr.status || aiErr.statusCode || 0;
-      if (status === 429) {
+      const errType = aiErr.error?.type || aiErr.type || 'unknown';
+      // Log the FULL error details so Railway logs show exactly what failed
+      logger.error(`[AiChat] AI loop error — status=${status} type=${errType} model=${CHAT_MODEL} message=${aiErr.message}`);
+
+      if (status === 401 || aiErr.message?.toLowerCase().includes('authentication') || aiErr.message?.toLowerCase().includes('api key')) {
+        // API key missing or invalid — this is a configuration issue
+        logger.error(`[AiChat] ⚠️ Anthropic API key is missing or invalid — set ANTHROPIC_API_KEY in Railway env vars`);
+        return { text: "I'm temporarily unavailable due to a configuration issue. Please try again shortly." };
+      } else if (status === 429) {
         return { text: "I'm getting a lot of requests right now — give me a moment and try again." };
-      } else if (status === 400 && aiErr.message?.includes('credit')) {
+      } else if (status === 400) {
+        logger.error(`[AiChat] Bad request (400) — possible invalid model name: "${CHAT_MODEL}". Full error: ${JSON.stringify(aiErr.error || aiErr.message)}`);
         return { text: "I'm temporarily unavailable due to a service issue. Please try again shortly." };
-      } else if (aiErr.message?.toLowerCase().includes('timeout') || aiErr.code === 'ECONNABORTED') {
+      } else if (status === 529 || status === 503 || status === 500) {
+        return { text: "Anthropic is temporarily overloaded. Give me a moment and try again." };
+      } else if (aiErr.message?.toLowerCase().includes('timeout') || aiErr.code === 'ECONNABORTED' || aiErr.code === 'UND_ERR_CONNECT_TIMEOUT') {
         return { text: "That search took too long. Try adding a budget or brand to your query to speed things up." };
       } else {
         return { text: "I ran into an issue on my end. Please try sending your message again." };
