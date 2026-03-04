@@ -203,6 +203,14 @@ class GoogleShoppingScraper extends BaseScraper {
   }
 
   /**
+   * Public wrapper around _isBlockedRetailer — safe to call from other services.
+   * Returns true if the retailer/URL combination is on the blocked list.
+   */
+  isBlockedRetailer(retailer, url) {
+    return this._isBlockedRetailer(retailer, url);
+  }
+
+  /**
    * Clean retailer name
    */
   _cleanRetailer(source) {

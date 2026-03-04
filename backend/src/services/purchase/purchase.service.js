@@ -458,7 +458,10 @@ class PurchaseService {
       // Serper returns google.com comparison pages by default (URL resolution
       // is skipped during search to avoid timeouts). We resolve the single
       // purchased product here — one Serper call, only when needed.
-      if (order.product.url && order.product.url.includes('google.com')) {
+      // Skip resolution if the retailer name is already on the blocked list —
+      // no point spending a Serper call on a doomed checkout.
+      const isBlockedByName = googleShoppingScraper.isBlockedRetailer(order.product.retailer, '');
+      if (order.product.url && order.product.url.includes('google.com') && !isBlockedByName) {
         logger.info(`Resolving google.com URL for checkout: ${order.product.title}`);
         const resolved = await googleShoppingScraper.resolveOneUrl(
           order.product.title,
@@ -474,11 +477,21 @@ class PurchaseService {
         }
       }
 
+      // Check if the (possibly resolved) URL points to a blocked retailer.
+      // Blocked retailers (Amazon, Bol.com, Zalando, etc.) require an account — guest
+      // checkout is not available, so the browser agent will always fail on them.
+      // We detect this AFTER URL resolution so we catch cases where google.com
+      // shopping URLs resolve to blocked retailer domains.
+      const isBlockedRetailerUrl = googleShoppingScraper.isBlockedRetailer(order.product.retailer, order.product.url);
+      if (isBlockedRetailerUrl) {
+        logger.warn(`⚠️ [${order.orderId}] "${order.product.retailer}" is a blocked retailer (requires account login — no guest checkout). Skipping browser agent, using mock result.`);
+      }
+
       // Determine if we should run the real checkout engine:
       //   - Normal mode (!isMockMode): always run if ready
       //   - Dry-run mode (isMockMode + dryRunCheckout): run with test card, stop before submit
-      // Note: google.com shopping URLs are allowed — the browser agent can navigate from them
-      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && !!order.product.url;
+      //   - Blocked retailer: always skip — browser would fail at login wall
+      const shouldRunRealCheckout = (!isMockMode || isDryRun) && checkoutAutomation.isReady() && !!order.product.url && !isBlockedRetailerUrl;
 
       if (shouldRunRealCheckout) {
         // Real checkout (or dry-run checkout)
