@@ -53,6 +53,14 @@ When the user asks for something:
 
 If the user references a previous result by name or number (e.g. "the second one", "Little Dutch", "option 3"), **do NOT search again** — use the product data already shown in the conversation to initiate the purchase.
 
+## URL lookup flow
+
+When the user pastes a product URL:
+1. Call lookup_product_url to get the title and price.
+2. If it succeeds → confirm with the user: "I found **[title]** for €[price] at [retailer]. Shall I order it?"
+3. If it fails or `priceFound` is false → **do NOT retry or search** — ask the user directly: "I found the product but couldn't read the price. What price do you see on the page?" Then call initiate_purchase with the URL and the price they give you.
+4. **Never call lookup_product_url more than once per URL** — if it fails, move on immediately.
+
 ## Profile check
 
 Before purchasing clothing, shoes, or food, call get_user_profile to check:
@@ -275,7 +283,7 @@ async function executeTool(toolName, toolInput, userId) {
 
       const domain = parsedUrl.hostname.replace('www.', '');
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const timeout = setTimeout(() => controller.abort(), 4000);
       let html = '';
       try {
         const resp = await fetch(url, {
