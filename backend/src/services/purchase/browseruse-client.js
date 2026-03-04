@@ -127,8 +127,10 @@ class BrowserUseClient {
   async isReady() {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+      // 15s timeout — Python agent on Railway can be slow to respond during cold-start
+      // or when the event loop is briefly busy. 5s was too tight and caused false negatives.
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const res = await fetch(`${this.baseUrl}/health`, {
         signal: controller.signal,
       });
