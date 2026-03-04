@@ -405,12 +405,10 @@ async def run_checkout(request: CheckoutRequest) -> CheckoutResult:
     
     llm = None
     llm_name = "unknown"
-    
-    if browser_use_key:
-        from browser_use import ChatBrowserUse
-        llm = ChatBrowserUse(api_key=browser_use_key)
-        llm_name = "ChatBrowserUse (cloud)"
-    elif anthropic_key:
+
+    # Priority: Anthropic (Claude) > OpenAI > browser-use cloud
+    # Anthropic is most reliable — browser-use cloud (bu-1-0) has intermittent 500 errors
+    if anthropic_key:
         from browser_use import ChatAnthropic
         llm = ChatAnthropic(model="claude-sonnet-4-20250514", api_key=anthropic_key, max_tokens=4096)
         llm_name = "claude-sonnet-4-20250514"
@@ -418,6 +416,10 @@ async def run_checkout(request: CheckoutRequest) -> CheckoutResult:
         from browser_use import ChatOpenAI
         llm = ChatOpenAI(model="gpt-4o", api_key=openai_key)
         llm_name = "gpt-4o"
+    elif browser_use_key:
+        from browser_use import ChatBrowserUse
+        llm = ChatBrowserUse(api_key=browser_use_key)
+        llm_name = "ChatBrowserUse (cloud)"
     else:
         return CheckoutResult(
             success=False,
