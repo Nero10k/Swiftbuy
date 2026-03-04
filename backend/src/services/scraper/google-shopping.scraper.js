@@ -367,14 +367,18 @@ class GoogleShoppingScraper extends BaseScraper {
 
       // Try to find the direct product page via organic search
       try {
-        // Build a targeted search query.
-        // If no domain mapping exists (e.g. Sony, a manufacturer), add the user's country
-        // so organic results are country-local retailer pages, not the brand's US store.
         const retailerDomain = this._getRetailerDomain(product.retailer);
-        const countryHint = geo?.name || '';
-        const searchQuery = retailerDomain
-          ? `${product.title} site:${retailerDomain}`
-          : `${product.title}${countryHint ? ` ${countryHint}` : ''} buy`.trim();
+
+        // No domain mapping (e.g. Sony, Apple — brand stores that may not support the
+        // user's country): skip resolution rather than pointing to a different retailer's
+        // URL. That would mismatch the product metadata (title, price, retailer) with
+        // the URL. The google.com URL stays and the caller filters the product out.
+        if (!retailerDomain) {
+          product._isGoogleShoppingPage = true;
+          return;
+        }
+
+        const searchQuery = `${product.title} site:${retailerDomain}`;
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000);
@@ -436,10 +440,10 @@ class GoogleShoppingScraper extends BaseScraper {
 
     try {
       const retailerDomain = this._getRetailerDomain(retailer);
-      const countryHint = geo?.name || '';
-      const searchQuery = retailerDomain
-        ? `${title} site:${retailerDomain}`
-        : `${title}${countryHint ? ` ${countryHint}` : ` ${retailer || ''}`} buy`.trim();
+      // No domain mapping → can't safely resolve without risking a URL from a different
+      // retailer (which would mismatch the product's title/price/retailer metadata).
+      if (!retailerDomain) return null;
+      const searchQuery = `${title} site:${retailerDomain}`;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
