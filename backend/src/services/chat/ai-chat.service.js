@@ -58,7 +58,7 @@ If the user references a previous result by name or number (e.g. "the second one
 When the user pastes a product URL:
 1. Call lookup_product_url to get the title and price.
 2. If it succeeds → confirm with the user: "I found **[title]** for €[price] at [retailer]. Shall I order it?"
-3. If it fails or `priceFound` is false → **do NOT retry or search** — ask the user directly: "I found the product but couldn't read the price. What price do you see on the page?" Then call initiate_purchase with the URL and the price they give you.
+3. If it fails or priceFound is false → **do NOT retry or search** — ask the user directly: "I found the product but couldn't read the price. What price do you see on the page?" Then call initiate_purchase with the URL and the price they give you.
 4. **Never call lookup_product_url more than once per URL** — if it fails, move on immediately.
 
 ## Profile check
