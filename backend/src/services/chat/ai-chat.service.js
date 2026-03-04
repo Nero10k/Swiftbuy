@@ -75,9 +75,10 @@ Before purchasing clothing, shoes, or food, call get_user_profile to check:
 
 1. Call initiate_purchase with the product data.
 2. If the response contains missingInfo — tell the user what's missing before approving.
-3. If requiresApproval is true, ask the user directly AND always include the orderId in your reply in this exact format so you can find it later:
+3. If requiresApproval is true, ask the user directly AND always embed the EXACT orderId from the initiate_purchase tool response (never invent one):
    > I've prepared your order: **[product]** — [price]. Should I go ahead and confirm?
-   > order_ref:[orderId]
+   > order_ref:[EXACT orderId from tool response — e.g. 68a3f9c2e4b0123456789abc]
+   CRITICAL: The orderId is the value returned in the `orderId` field of the initiate_purchase result. Never write "pending_order_001" or any placeholder — always use the actual value.
 4. When the user says yes ("yes", "go ahead", "book it", "confirm"):
    - Look in the recent conversation for the "order_ref:" line to get the orderId.
    - If you can't find it in the text, call get_recent_orders to find the most recent pending order.
@@ -376,16 +377,36 @@ async function executeTool(toolName, toolInput, userId) {
     }
 
     case 'approve_order': {
-      const order = await Order.findById(toolInput.orderId);
-      if (!order) return { error: 'Order not found' };
+      // Robust lookup — the LLM sometimes hallucinates a placeholder ID instead of
+      // using the real MongoDB _id returned by initiate_purchase. We try three
+      // strategies so approval always works:
+      //   1. MongoDB _id (the correct case)
+      //   2. orderId string field on the document
+      //   3. Most-recent pending_approval order for this user (ultimate fallback)
+      let order = null;
+
+      if (toolInput.orderId && /^[0-9a-fA-F]{24}$/.test(toolInput.orderId)) {
+        order = await Order.findOne({ _id: toolInput.orderId, userId });
+      }
+      if (!order) {
+        order = await Order.findOne({ orderId: toolInput.orderId, userId });
+      }
+      if (!order) {
+        // Fallback: use the most recent pending order — handles hallucinated IDs
+        order = await Order.findOne({ userId, status: 'pending_approval' }).sort({ createdAt: -1 });
+        if (order) {
+          logger.warn(`[AiChat] approve_order: ID "${toolInput.orderId}" not found — falling back to most recent pending order ${order._id}`);
+        }
+      }
+
+      if (!order) return { error: 'No pending order found to approve' };
       if (order.userId.toString() !== userId.toString()) return { error: 'Not authorized' };
 
       // Fire and forget — don't await the full checkout (takes 60-90s)
-      // Just kick it off and let the user poll via get_order_status
-      purchaseService.approveOrder(toolInput.orderId, userId).catch((err) => {
+      purchaseService.approveOrder(order._id.toString(), userId).catch((err) => {
         logger.warn(`[AiChat] approveOrder background error: ${err.message}`);
       });
-      return { success: true, orderId: toolInput.orderId, status: 'processing', message: 'Order approved and checkout started. Use get_order_status to check progress.' };
+      return { success: true, orderId: order._id.toString(), status: 'processing', message: 'Order approved and checkout started. Use get_order_status to check progress.' };
     }
 
     case 'reject_order': {
