@@ -549,10 +549,15 @@ class PurchaseService {
             }
           }
 
-          // Get card details — real from Karma, or test card for dry-run / demo mode
+          // Get card details — real from Karma, or test card for dry-run / demo / no wallet
           let cardDetails;
-          if (isDryRun || config.checkout.demoMode) {
-            logger.info(`🧪 ${isDryRun ? 'DRY-RUN' : 'DEMO_MODE'} CHECKOUT — using test Visa card for ${order.orderId}`);
+          const hasKarmaWallet = !!(user.karma?.skAgent);
+          if (isDryRun || config.checkout.demoMode || !hasKarmaWallet) {
+            if (!hasKarmaWallet && !isDryRun && !config.checkout.demoMode) {
+              logger.warn(`⚠️ [${order.orderId}] No Karma wallet configured — falling back to test card so browser still fires. Set DEMO_MODE=true or connect a wallet for production.`);
+            } else {
+              logger.info(`🧪 ${isDryRun ? 'DRY-RUN' : 'DEMO_MODE'} CHECKOUT — using test Visa card for ${order.orderId}`);
+            }
             cardDetails = {
               number: '4111111111111111',
               cvv: '123',
