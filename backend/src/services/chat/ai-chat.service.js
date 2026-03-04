@@ -100,6 +100,7 @@ Before purchasing clothing, shoes, or food, call get_user_profile to check:
 
 - INSUFFICIENT_FUNDS → "You don't have enough in your wallet for this. Want to add funds?"
 - CHECKOUT_FAILED → "The checkout didn't complete on [retailer] — they may require an account. Want me to find the same product on a different store?"
+- URL_RESOLUTION_FAILED → "I couldn't find a direct link to that product on [retailer]'s website. Could you paste the product page URL directly in chat?"
 - PRODUCT_NOT_FOUND → "That product isn't available anymore. Want me to search again?"
 - NO_WALLET → "You'll need to connect your wallet first — go to your dashboard > Wallet to set it up."
 - DAILY_LIMIT_EXCEEDED → "This would put you over your daily spending limit. Want me to find a cheaper option?"`;

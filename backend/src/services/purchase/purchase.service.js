@@ -479,7 +479,16 @@ class PurchaseService {
             order.product.url = resolved;
             await order.save();
           } else {
-            logger.warn(`[${order.orderId}] Could not resolve URL for "${order.product.title}" — checkout may fail or be skipped`);
+            // Clear a google.com URL that couldn't be resolved — it's useless for checkout.
+            // Leaving it would cause hasUrl=true and pass the gate, but the browser agent
+            // would land on a google.com shopping page and fail. Better to fail fast here.
+            if (order.product.url && order.product.url.includes('google.com')) {
+              logger.warn(`[${order.orderId}] google.com URL could not be resolved — clearing it to prevent a useless checkout attempt`);
+              order.product.url = '';
+              await order.save();
+            } else {
+              logger.warn(`[${order.orderId}] Could not resolve URL for "${order.product.title}" — checkout will be skipped`);
+            }
           }
         }
       }
@@ -598,9 +607,21 @@ class PurchaseService {
         const skipReasons = [];
         if (isMockMode && !isDryRun) skipReasons.push('MOCK_CHECKOUT=true and DRY_RUN=false');
         if (!isAutomationReady) skipReasons.push('checkout automation not ready (USE_BROWSER_USE not set?)');
-        if (!hasUrl) skipReasons.push('product URL is empty');
+        if (!hasUrl) skipReasons.push('product URL is empty or unresolvable');
         if (isBlockedRetailerUrl) skipReasons.push(`"${order.product.retailer}" is a blocked retailer`);
-        logger.warn(`⏭️ [${order.orderId}] Skipping real checkout — ${skipReasons.join('; ')}. Using mock result.`);
+        logger.warn(`⏭️ [${order.orderId}] Skipping real checkout — ${skipReasons.join('; ')}.`);
+
+        // In real (non-mock) mode, fail the order if we have no usable URL.
+        // Silently mock-confirming would give the user a fake "success" with no actual purchase.
+        if (!isMockMode && !isDryRun && !hasUrl) {
+          throw new AppError(
+            `Could not find a direct product URL for "${order.product.title}" on ${order.product.retailer}. ` +
+            `Try pasting the product page URL directly in chat.`,
+            400,
+            'URL_RESOLUTION_FAILED'
+          );
+        }
+
         checkoutResult = {
           success: true,
           retailerOrderId: generateId('ret'),
