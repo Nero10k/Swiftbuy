@@ -72,17 +72,16 @@ class SearchService {
         await googleShoppingScraper._resolveProductUrls(cached);
         await this._saveToCache(cacheKey, cached);
       }
-      const cleanCached = cached.filter((p) => !p.url || !p.url.includes('google.com'));
       return {
-        products: cleanCached.slice(0, limit),
+        products: cached.slice(0, limit),
         meta: {
           source: 'cache',
           query: rawQuery,
           processedQuery: searchQuery,
           intent: processed.intent,
           category: processed.category,
-          resultCount: cleanCached.length,
-          retailers: [...new Set(cleanCached.map((p) => p.retailer))],
+          resultCount: cached.length,
+          retailers: [...new Set(cached.map((p) => p.retailer))],
         },
       };
     }
@@ -105,10 +104,6 @@ class SearchService {
       // Universal search — resolveUrls=true ensures we get direct retailer URLs
       products = await scraperManager.searchAll(searchQuery, mergedFilters, limit, processed.intent, geo, true);
     }
-
-    // Drop any products whose URL still couldn't be resolved (unresolvable google.com URLs
-    // are useless for checkout and waste the browser agent on a dead-end page).
-    products = products.filter((p) => !p.url || !p.url.includes('google.com'));
 
     // Step 4: Save to cache + DB
     if (products.length > 0) {
