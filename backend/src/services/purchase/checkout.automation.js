@@ -68,12 +68,19 @@ class CheckoutAutomation {
     const checkoutId = generateId('chk');
 
     // ═══════════════════════════════════════════════════════════════
-    // TRY BROWSER USE AGENT FIRST (Primary — cheaper, faster, learns)
+    // TRY BROWSER USE AGENT (Primary — cheaper, faster, learns)
+    //
+    // IMPORTANT: We do NOT do a pre-flight health check here.
+    // The old pattern was: ping /health → if OK, call /checkout.
+    // Problem: the health ping has its own timeout and can fail while the
+    // agent is cold-starting or briefly busy, returning browserUseAvailable=false
+    // and silently skipping the real checkout.
+    // Fix: call /checkout directly. If the agent is truly not running, the
+    // fetch() will throw a connection error caught below, which propagates up
+    // and properly marks the order as failed.
     // ═══════════════════════════════════════════════════════════════
-    const browserUseAvailable = await this._isBrowserUseAvailable();
-    
-    if (browserUseAvailable) {
-      logger.info(`[${checkoutId}] 🚀 Using Browser Use agent for ${domain} (order: ${order.orderId})`);
+    if (config.checkout.useBrowserUse) {
+      logger.info(`[${checkoutId}] 🚀 Calling Browser Use agent for ${domain} (order: ${order.orderId})`);
       try {
         const result = await browserUseClient.executeCheckout(
           order,
@@ -82,7 +89,7 @@ class CheckoutAutomation {
           user,
           { dryRun, headless: config.checkout.headless }
         );
-        
+
         logger.info(`[${checkoutId}] Browser Use result:`, {
           success: result.success,
           executionMs: result.executionMs,
@@ -95,43 +102,16 @@ class CheckoutAutomation {
           return result;
         }
 
-        // If Browser Use failed AND we're in browser-use-only mode, return the
-        // failure result directly — do NOT fall back to Anthropic Computer Use.
-        // The Anthropic fallback uses local Playwright on Railway which is unreliable
-        // and does not show up in Steel.dev Remote Browsers, causing confusing behavior.
-        if (config.checkout.useBrowserUse) {
-          logger.warn(`[${checkoutId}] Browser Use failed (${result.error}) — browser-use-only mode, no fallback`);
-          return result;
-        }
-
-        // Non-browser-use mode: fall through to Anthropic Computer Use below
-        if (this.anthropic) {
-          logger.warn(`[${checkoutId}] Browser Use failed (${result.error}), falling back to Anthropic Computer Use`);
-        } else {
-          return result;
-        }
+        // Browser launched but task failed (CAPTCHA, login wall, site error, etc.)
+        // No fallback — return the failure so purchase.service can mark order failed.
+        logger.warn(`[${checkoutId}] Browser Use task failed: ${result.error}`);
+        return result;
       } catch (buError) {
-        if (config.checkout.useBrowserUse) {
-          logger.warn(`[${checkoutId}] Browser Use error (${buError.message}) — browser-use-only mode, no fallback`);
-          throw buError;
-        }
-        if (this.anthropic) {
-          logger.warn(`[${checkoutId}] Browser Use error (${buError.message}), falling back to Anthropic Computer Use`);
-        } else {
-          throw buError;
-        }
+        // Network error — agent not reachable (connection refused, timeout, etc.)
+        // Re-throw so purchase.service.js marks the order as failed instead of silently confirming.
+        logger.error(`[${checkoutId}] Browser Use agent unreachable: ${buError.message}`);
+        throw buError;
       }
-    } else if (config.checkout.useBrowserUse) {
-      // Browser-use is configured but agent isn't reachable — return failure immediately.
-      // Do NOT fall back to Anthropic Computer Use (local Playwright, no Steel.dev session).
-      logger.warn(`[${checkoutId}] Browser Use agent unreachable — browser-use-only mode, returning failure`);
-      return {
-        success: false,
-        error: 'Browser Use agent not reachable',
-        executionMs: 0,
-        llmCalls: 0,
-        usedSavedFlow: false,
-      };
     }
 
     // ═══════════════════════════════════════════════════════════════

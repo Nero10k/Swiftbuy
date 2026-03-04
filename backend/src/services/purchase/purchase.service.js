@@ -576,7 +576,15 @@ class PurchaseService {
             executionMs: checkoutResult.executionMs,
             llmCalls: checkoutResult.llmCalls,
             usedSavedFlow: checkoutResult.usedSavedFlow,
+            error: checkoutResult.error,
           });
+
+          // If the checkout engine returned success=false (agent reached but task failed),
+          // throw so the order is marked as failed instead of silently confirmed.
+          // In DEMO_MODE we're lenient — treat any response as "good enough" for demo purposes.
+          if (!checkoutResult.success && !config.checkout.demoMode) {
+            throw new Error(checkoutResult.error || 'Checkout did not complete successfully');
+          }
         } catch (checkoutError) {
           logger.error(`Checkout automation failed for ${order.orderId}: ${checkoutError.message}`);
           throw new AppError(
